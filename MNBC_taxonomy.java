@@ -12,7 +12,7 @@ public class MNBC_taxonomy { //Add the option to simultaneously write taxonomy i
 	public static String refseqAssemblySummaryPath; //Example filename: assembly_summary_refseq.txt
 	public static String nodeDmpPath; //Example filename: nodes.dmp
 	public static String outputPath; //Example filename: refSeq_prokaryote_complete_genomes_ok_status_metainfo.txt
-	public static boolean plasmid; //Whether to write taxonomy information of plasmids
+	public static boolean plasmid = false; //Whether to write taxonomy information of plasmids
 	
 	public static void main(String[] args) {
 		if(args.length == 1) {
@@ -245,7 +245,7 @@ public class MNBC_taxonomy { //Add the option to simultaneously write taxonomy i
 		System.out.println("-a:	Assembly summary file downloaded from NCBI (e.g. assembly_summary_refseq.txt from https://ftp.ncbi.nlm.nih.gov/genomes/refseq/))");
 		System.out.println("-n:	Taxonomy nodes.dmp file downoaded from NCBI (e.g. taxdmp.zip from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)");		
 		System.out.println("-i:	Input directory containing the (gzipped) files of reference sequences in the database (e.g. GCF_000009045.1_ASM904v1_genomic.fna.gz is a reference genome sequence file downloaded from RefSeq)");
-		System.out.println("-p:	Also extract taxonomy of plasmids in the reference genomes");
 		System.out.println("-o:	Output taxonomy file for the database");
+		System.out.println("-p (optional): Also extract taxonomy of plasmids in the reference genomes");
 	}
 }
