@@ -1,29 +1,26 @@
-/**
- *
- * @author Ruipeng Lu (ruipeng.lu@inspection.gc.ca)
- * 
- */
-
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.zip.GZIPInputStream;
 
-public class MNBC_taxonomy {
+public class MNBC_taxonomy { //Add the option to simultaneously write taxonomy information of plasmids within the reference genomes  
 	public static String genomeDirPath; //Directory containing downloaded RefSeq reference genomes of interest, these genomes will be used as the reference database
 	public static String refseqAssemblySummaryPath; //Example filename: assembly_summary_refseq.txt
 	public static String nodeDmpPath; //Example filename: nodes.dmp
 	public static String outputPath; //Example filename: refSeq_prokaryote_complete_genomes_ok_status_metainfo.txt
+	public static boolean plasmid; //Whether to write taxonomy information of plasmids
 	
-	public static void execute(String[] args) {
+	public static void main(String[] args) {
 		if(args.length == 1) {
 			printHelpInfo();
 			System.exit(0);
 		}
 		
-		for(int i = 1; i < args.length; i++) {
+		for(int i = 0; i < args.length; i++) {
 			if(args[i].startsWith("-")) {
 				switch(args[i].charAt(1)) {
 					case 'a':
@@ -38,6 +35,9 @@ public class MNBC_taxonomy {
 					case 'o':
 						outputPath = args[i + 1];
 						break;
+					case 'p':
+						plasmid = true;
+						break;
 					case 'h':
 						printHelpInfo();
 						System.exit(0);
@@ -50,15 +50,15 @@ public class MNBC_taxonomy {
 			System.exit(0);
 		}
 		
-		ArrayList<String> refseqAssemblyIDs = readAssemlyIds(genomeDirPath);
+		//ArrayList<String> refseqAssemblyIDs = readAssemlyIds(genomeDirPath);
 		HashMap<String, String[]> refseqAssemblyID2Taxid = readRefseqAssemblySummary(refseqAssemblySummaryPath);
 		HashMap<String, String> taxid2TaxLevel = new HashMap<String, String>();
 		HashMap<String, String> taxid2ParentTaxid = readNodeDmp(nodeDmpPath, taxid2TaxLevel);
 		
 		try {
 			PrintWriter writer = new PrintWriter(outputPath);
-			writer.print("RefSeq assembly ID\ttaxid.species\ttaxid.genus\ttaxid.family\ttaxid.order\ttaxid.class\ttaxid.phylum\ttaxid.superkingdom\tOrganism name\n");
-			generateGenomeTaxonomyTableRows(writer, refseqAssemblyIDs, refseqAssemblyID2Taxid, taxid2TaxLevel, taxid2ParentTaxid);
+			writer.print("Assembly ID\tType\ttaxid.species\ttaxid.genus\ttaxid.family\ttaxid.order\ttaxid.class\ttaxid.phylum\ttaxid.superkingdom\tDescription\n");
+			generateGenomeTaxonomyTableRows(writer, genomeDirPath, refseqAssemblyID2Taxid, taxid2TaxLevel, taxid2ParentTaxid);
 			writer.close();
 		} catch(Exception e) {
 			System.out.println("Error in writing results to " + outputPath);
@@ -69,9 +69,11 @@ public class MNBC_taxonomy {
 		System.out.println("done");
 	}
 	
-	private static void generateGenomeTaxonomyTableRows(PrintWriter writer, ArrayList<String> refseqAssemblyIDs, HashMap<String, String[]> refseqAssemblyID2Taxid, HashMap<String, String> taxid2TaxLevel, HashMap<String, String> taxid2ParentTaxid) {
-		for(String assemblyID : refseqAssemblyIDs) {
-			String row = assemblyID;
+	private static void generateGenomeTaxonomyTableRows(PrintWriter writer, String genomeDirPath, HashMap<String, String[]> refseqAssemblyID2Taxid, HashMap<String, String> taxid2TaxLevel, HashMap<String, String> taxid2ParentTaxid) {
+		File[] genomeFiles = new File(genomeDirPath).listFiles();
+		for(File genomeFile : genomeFiles) {
+			String[] fields = genomeFile.getName().split("_");
+			String assemblyID = fields[0] + "_" + fields[1];			
 			String[] ranks = new String[7];
 			//System.out.println("assemblyID " + assemblyID);
 			String[] taxidAndName = refseqAssemblyID2Taxid.get(assemblyID);
@@ -88,14 +90,50 @@ public class MNBC_taxonomy {
 			}				
 			fillRanksArray(ranks[0], ranks, taxid2TaxLevel, taxid2ParentTaxid);			
 			
+			String row = assemblyID;
+			if(ranks[6].equals("10239")) {
+				row += "\tvirus";
+			} else {
+				row += "\tchromosome";
+			}
 			for(String rank : ranks) {
 				row += "\t" + rank;
 			}
-			row += "\t" + taxidAndName[1] + "\n";
-			
+			row += "\t" + taxidAndName[1] + "\n";			
 			//System.out.println("One row result: " + row);
 			writer.print(row);
+			
+			if(plasmid) {
+				BufferedReader reader = null;
+				try {
+					if(genomeFile.getName().endsWith(".gz")) {
+						reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(genomeFile)), "UTF-8"));
+					} else {
+						reader = new BufferedReader(new FileReader(genomeFile));
+					}
+					
+					String line = null;
+					while((line = reader.readLine()) != null) {
+						if(line.startsWith(">")) {
+							line = line.toLowerCase();
+							if(line.contains("plasmid")) {
+								row = line.split("\\s+")[0].substring(1) + "\tplasmid";
+								for(String rank : ranks) {
+									row += "\t" + rank;
+								}
+								row += "\t" + assemblyID + "\n";
+								writer.print(row);
+							}
+						}
+					}
+					reader.close();
+				} catch(Exception e) {
+					e.printStackTrace();
+					System.exit(1);
+				}				
+			}			
 		}
+		writer.close();
 	}
 	
 	private static void fillRanksArray(String initial, String[] ranks, HashMap<String, String> taxid2TaxLevel, HashMap<String, String> taxid2ParentTaxid) {
@@ -175,7 +213,7 @@ public class MNBC_taxonomy {
 			reader.readLine();
 			while((line = reader.readLine()) != null) {
 				String[] fields = line.split("\t");				
-				refseqAssemblyID2Taxid.put(fields[0], new String[] {fields[6], fields[7] + " " + fields[8]});							
+				refseqAssemblyID2Taxid.put(fields[0], new String[] {fields[6], fields[7] + (fields[8].isBlank() ? "" : " " + fields[8])});							
 			}
 			reader.close();
 		} catch(Exception e) {
@@ -188,7 +226,7 @@ public class MNBC_taxonomy {
 		return refseqAssemblyID2Taxid;
 	}
 	
-	private static ArrayList<String> readAssemlyIds(String genomeDirPath) {
+	/*private static ArrayList<String> readAssemlyIds(String genomeDirPath) {
 		ArrayList<String> refseqAssemblyIDs = new ArrayList<String>();
 		
 		File[] genomes = new File(genomeDirPath).listFiles();
@@ -199,14 +237,15 @@ public class MNBC_taxonomy {
 		
 		System.out.println("Finished reading " + refseqAssemblyIDs.size() + " assembly IDs from " + genomeDirPath);
 		return refseqAssemblyIDs;
-	}
+	}*/
 	
 	private static void printHelpInfo() {
-		System.out.println("This MNBC_taxonomy tool (v1.0) generates the taxonomy file for a reference database.");
+		System.out.println("This MNBC_taxonomy tool (v2.0) generates the taxonomy file for a reference database.");
 		System.out.println("-h:	Show this help menu");
 		System.out.println("-a:	Assembly summary file downloaded from NCBI (e.g. assembly_summary_refseq.txt from https://ftp.ncbi.nlm.nih.gov/genomes/refseq/))");
 		System.out.println("-n:	Taxonomy nodes.dmp file downoaded from NCBI (e.g. taxdmp.zip from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)");		
 		System.out.println("-i:	Input directory containing the (gzipped) files of reference sequences in the database (e.g. GCF_000009045.1_ASM904v1_genomic.fna.gz is a reference genome sequence file downloaded from RefSeq)");
+		System.out.println("-p:	Also extract taxonomy of plasmids in the reference genomes");
 		System.out.println("-o:	Output taxonomy file for the database");
 	}
 }

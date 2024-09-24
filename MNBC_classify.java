@@ -1,3 +1,9 @@
+/**
+ * 
+ * @author Ruipeng Lu (ruipeng.lu@inspection.gc.ca)
+ * 
+ */
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -27,8 +33,8 @@ import org.eclipse.collections.api.set.primitive.MutableIntSet;
 import org.eclipse.collections.impl.list.mutable.primitive.IntArrayList;
 import org.eclipse.collections.impl.set.mutable.primitive.IntHashSet;
 
-public class ME_MNBCClassify {
-	private static int k;
+public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
+	private static int k = 15;
 	private static int numberOfThreads;
 	private static float kmerPenalty = -2000.0F;
 	private static float delta = 1500.0F;
@@ -38,6 +44,7 @@ public class ME_MNBCClassify {
 	private static boolean readType; //Whether reads are paired-end
 	private static String startPath;
 	private static String endPath;
+	private static int unclassifiedThreshold = 0; //For a read, when at least (1/unclassifiedThreshold) of read minimizers are shared with a genome, the genome will be taken into account. So if all genomes don't meet this cutoff, the read is unclassified. If set to 0, all genomes are taken into account, every read will be definitely classified
 	
 	private static String[] genomeIds;
 	private static float[] logFres;
@@ -49,6 +56,11 @@ public class ME_MNBCClassify {
 	private static AtomicInteger erroredConsumerCount = new AtomicInteger();
 	
 	public static void main(String[] args) {
+		if(args.length == 1) {
+			printHelpInfo();
+			System.exit(0);
+		}
+		
 		for(int i = 0; i < args.length; i++) {
 			if(args[i].startsWith("-")) {
 				switch(args[i].charAt(1)) {
@@ -73,6 +85,9 @@ public class ME_MNBCClassify {
 					case 'o':
 						outputFilePath = args[i + 1];
 						break;
+					case 'u':
+						unclassifiedThreshold = Integer.parseInt(args[i + 1]);
+						break;
 					case 't':
 						readType = args[i + 1].equals("2") ? true : false; //The parameter value itself is "1" or "2"
 						startPath = args[i + 2];
@@ -85,6 +100,11 @@ public class ME_MNBCClassify {
 						System.exit(0);
 				}
 			}
+		}
+		
+		if((k <= 0) || (numberOfThreads == 0) || (dbDirPath == null) || (metaFilePath == null) || (outputFilePath == null) || (startPath == null) || (unclassifiedThreshold < 0)) {
+			System.out.println("Error: not all required parameters are correctly set -- Run 'MNBC classify -h' for help");
+			System.exit(0);
 		}
 		
 		long startTime = System.nanoTime();		
@@ -145,7 +165,7 @@ public class ME_MNBCClassify {
 			PrintWriter writer = null;
 			if(finishedReadIds == null) {
 				writer = new PrintWriter(new FileWriter(outputFilePath), true);
-				writer.println("Read\tGenome\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tSuperkingdom");
+				writer.println("Read\tType\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tSuperkingdom\tDescription");
 			} else {
 				writer = new PrintWriter(new FileWriter(outputFilePath, true), true);
 			}			
@@ -176,7 +196,7 @@ public class ME_MNBCClassify {
 			String line = reader.readLine();
 			while((line = reader.readLine()) != null) {
 				String[] fields = line.split("\t");
-				if(fields.length == 9) {
+				if(fields.length == 10 || line.contains("unclassified")) {
 					finishedReadIds.add(fields[0]);
 				}
 			}
@@ -196,7 +216,7 @@ public class ME_MNBCClassify {
 			String line = reader.readLine();
 			while((line = reader.readLine()) != null) {
 				String[] fields = line.split("\t");
-				completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7]});
+				completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8], fields[9]});
 			}
 			reader.close();
 		} catch(Exception e) {
@@ -233,7 +253,7 @@ public class ME_MNBCClassify {
 							addKmersOfOneTestFrag(read[1], readMinimizers);
 							addKmersOfOneTestFrag(read[2], readMinimizers);
 							if(readMinimizers.isEmpty()) {
-								resultQueue.put(read[0] + "\tnull\tnull\tnull\tnull\tnull\tnull\tnull\tnull");
+								resultQueue.put(read[0] + "\tunclassified");
 								continue;
 							}
 							processReadMinimizers(readMinimizers);
@@ -250,7 +270,7 @@ public class ME_MNBCClassify {
 							MutableIntSet readMinimizers = new IntHashSet();							
 							addKmersOfOneTestFrag(read[1], readMinimizers);
 							if(readMinimizers.isEmpty()) {
-								resultQueue.put(read[0] + "\tnull\tnull\tnull\tnull\tnull\tnull\tnull\tnull");
+								resultQueue.put(read[0] + "\tunclassified");
 								continue;
 							}							
 							processReadMinimizers(readMinimizers);
@@ -265,59 +285,79 @@ public class ME_MNBCClassify {
 		}
 		
 		private void processReadMinimizers(MutableIntSet readMinimizers) throws Exception {
+			String outcome = read[0];
 			TreeMap<Float, MutableIntList> topScores = new TreeMap<>();
-			for(int i = 0; i < genomeIds.length; i++) {							
-				float score = 0.0F;
-
-				IntIterator it = readMinimizers.intIterator();
-				while(it.hasNext()) {
-					if(genomeMinimizers[i].contains(it.next())) {
-						score += logFres[i];
-					} else {
-						score += kmerPenalty;
+			if(unclassifiedThreshold == 0) {
+				for(int i = 0; i < genomeIds.length; i++) {							
+					float score = 0.0F;
+					
+					IntIterator it = readMinimizers.intIterator();
+					while(it.hasNext()) {
+						if(genomeMinimizers[i].contains(it.next())) {
+							score += logFres[i];
+						} else {
+							score += kmerPenalty;
+						}
 					}
+					
+					if(topScores.containsKey(score)) {
+						topScores.get(score).add(i);
+					} else {
+						MutableIntList genomeIdsWithScore = new IntArrayList();
+						genomeIdsWithScore.add(i);
+						topScores.put(score, genomeIdsWithScore);									
+					}					
 				}
+			} else {
+				for(int i = 0; i < genomeIds.length; i++) {							
+					float score = 0.0F;
+					int counter = 0; // Number of read minimizers shared with genome
 
-				if(topScores.containsKey(score)) {
-					topScores.get(score).add(i);
-				} else {
-					MutableIntList genomeIdsWithScore = new IntArrayList();
-					genomeIdsWithScore.add(i);
-					topScores.put(score, genomeIdsWithScore);									
+					IntIterator it = readMinimizers.intIterator();
+					while(it.hasNext()) {
+						if(genomeMinimizers[i].contains(it.next())) {
+							score += logFres[i];
+							counter++;
+						} else {
+							score += kmerPenalty;
+						}
+					}
+					
+					if((counter * unclassifiedThreshold) >= readMinimizers.size()) { //At lease (1/unclassifiedThreshold) of read minimizers are in genome, genome is taken into account, make classification
+						if(topScores.containsKey(score)) {
+							topScores.get(score).add(i);
+						} else {
+							MutableIntList genomeIdsWithScore = new IntArrayList();
+							genomeIdsWithScore.add(i);
+							topScores.put(score, genomeIdsWithScore);									
+						}
+					}					
+				}
+				
+				if(topScores.isEmpty()) {
+					outcome += "\tunclassified";
+					resultQueue.put(outcome);
+					return;
 				}
 			}
 			
-			MutableIntList votingGenomes = processTopScores(topScores);
-			//HashMap<Integer, Float> votingGenomes2Scores = processTopScores(topScores);
-			String outcome = read[0];															
-			if(/*votingGenomes2Scores.size() == 1*/votingGenomes.size() == 1) {
+			MutableIntList votingGenomes = processTopScores(topScores);																		
+			if(votingGenomes.size() == 1) {
 				//System.out.println("Read " + read[0] + " has 1 voting genome");
-				String predictedGenomeId = genomeIds[/*votingGenomes2Scores.keySet().iterator().next()*/votingGenomes.getFirst()];
+				String predictedGenomeId = genomeIds[votingGenomes.getFirst()];
 				String[] predictedTaxonIds = completeGenomeId2TaxIds.get(predictedGenomeId);
-				outcome += "\t" + predictedGenomeId;
-				for(String predictedId : predictedTaxonIds) {
-					outcome += "\t" + predictedId;
-				}								
+				for(int i = 0; i <= 7; i++) {
+					outcome += "\t" + predictedTaxonIds[i];
+				}
+				outcome += "\t" + predictedGenomeId + ":" + predictedTaxonIds[8];
 			} else {
 				//System.out.println("Read " + read[0] + " has " + votingGenomes.size() + " voting genomes");
 				ArrayList<String> prokOrViralGenomes = new ArrayList<String>();
 				ArrayList<String> plasmids = new ArrayList<String>();
-				/*float prokOrViralGenomesMeanScore = 0.0F;
-				float plasmidsMeanScore = 0.0F;
-				for(int votingGenome : votingGenomes2Scores.keySet()) {
-					String genomeId = genomeIds[votingGenome];
-					if(genomeId.contains("plasmid")) {
-						plasmids.add(genomeId);
-						plasmidsMeanScore += votingGenomes2Scores.get(votingGenome);
-					} else {
-						prokOrViralGenomes.add(genomeId);
-						prokOrViralGenomesMeanScore += votingGenomes2Scores.get(votingGenome);
-					}
-				}*/
 				MutableIntIterator it = votingGenomes.intIterator();
 				while(it.hasNext()) {
 					String genomeId = genomeIds[it.next()];
-					if(genomeId.contains("plasmid")) {
+					if(completeGenomeId2TaxIds.get(genomeId)[0].equals("plasmid")) {
 						plasmids.add(genomeId);						
 					} else {
 						prokOrViralGenomes.add(genomeId);
@@ -337,16 +377,22 @@ public class ME_MNBCClassify {
 					}
 					//System.out.println("Dominant species is " + dominantSpecies + " with " + dominantCount + " genomes");
 				
-					outcome += "\tnon-plasmid";
-					String[] taxonIds = completeGenomeId2TaxIds.get(speciesId2GenomeIds.get(dominantSpecies).get(0));
-					for(String taxonId : taxonIds) {
-						outcome += "\t" + taxonId;
+					ArrayList<String> dominantGenomeIds = speciesId2GenomeIds.get(dominantSpecies);
+					String dominantGenomeId = dominantGenomeIds.get(0);
+					String[] taxonIds = completeGenomeId2TaxIds.get(dominantGenomeId);
+					for(int i = 0; i <= 7; i++) {
+						outcome += "\t" + taxonIds[i];
+					}
+					outcome += "\t" + dominantGenomeId + ":" + taxonIds[8];
+					for(int i = 1; i < dominantGenomeIds.size(); i++) {
+						dominantGenomeId = dominantGenomeIds.get(i);
+						outcome += ";" + dominantGenomeId + ":" + completeGenomeId2TaxIds.get(dominantGenomeId)[8];
 					}
 				} else /*if(prokOrViralGenomes.size() < plasmids.size())*/ {
-					HashMap<String, ArrayList<String>> speciesId2GenomeIds = fillSpeciesId2GenomeIds(plasmids);								
+					HashMap<String, ArrayList<String>> speciesId2PlasmidIds = fillSpeciesId2GenomeIds(plasmids);								
 					String dominantSpecies = null; //Multiple species may have the same greatest number of genomes
 					int dominantCount = 0;
-					for(Entry<String, ArrayList<String>> species : speciesId2GenomeIds.entrySet()) {
+					for(Entry<String, ArrayList<String>> species : speciesId2PlasmidIds.entrySet()) {
 						int count = species.getValue().size();
 						if(count >= dominantCount) {
 							dominantSpecies = species.getKey();
@@ -355,85 +401,21 @@ public class ME_MNBCClassify {
 					}
 					//System.out.println("Dominant species is " + dominantSpecies + " with " + dominantCount + " genomes");
 				
-					outcome += "\tplasmid";
-					String[] taxonIds = completeGenomeId2TaxIds.get(speciesId2GenomeIds.get(dominantSpecies).get(0));
-					for(String taxonId : taxonIds) {
-						outcome += "\t" + taxonId;
+					ArrayList<String> dominantPlasmidIds = speciesId2PlasmidIds.get(dominantSpecies);
+					String dominantPlasmidId = dominantPlasmidIds.get(0);
+					String[] taxonIds = completeGenomeId2TaxIds.get(dominantPlasmidId);
+					for(int i = 0; i <= 7; i++) {
+						outcome += "\t" + taxonIds[i];						
 					}
-				}/* else { //Same number of prokOrViralGenomes and plasmids
-					plasmidsMeanScore /= plasmids.size();
-					prokOrViralGenomesMeanScore /= prokOrViralGenomes.size();
-					if(plasmidsMeanScore >= prokOrViralGenomesMeanScore) {
-						HashMap<String, ArrayList<String>> speciesId2GenomeIds = fillSpeciesId2GenomeIds(plasmids);								
-						String dominantSpecies = null; //Multiple species may have the same greatest number of genomes
-						int dominantCount = 0;
-						for(Entry<String, ArrayList<String>> species : speciesId2GenomeIds.entrySet()) {
-							int count = species.getValue().size();
-							if(count >= dominantCount) {
-								dominantSpecies = species.getKey();
-								dominantCount = count;
-							}
-						}
-						//System.out.println("Dominant species is " + dominantSpecies + " with " + dominantCount + " genomes");
-					
-						outcome += "\tplasmid";
-						String[] taxonIds = completeGenomeId2TaxIds.get(speciesId2GenomeIds.get(dominantSpecies).get(0));
-						for(String taxonId : taxonIds) {
-							outcome += "\t" + taxonId;
-						}
-					} else {
-						HashMap<String, ArrayList<String>> speciesId2GenomeIds = fillSpeciesId2GenomeIds(prokOrViralGenomes);								
-						String dominantSpecies = null; //Multiple species may have the same greatest number of genomes
-						int dominantCount = 0;
-						for(Entry<String, ArrayList<String>> species : speciesId2GenomeIds.entrySet()) {
-							int count = species.getValue().size();
-							if(count >= dominantCount) {
-								dominantSpecies = species.getKey();
-								dominantCount = count;
-							}
-						}
-						//System.out.println("Dominant species is " + dominantSpecies + " with " + dominantCount + " genomes");
-					
-						outcome += "\tnon-plasmid";
-						String[] taxonIds = completeGenomeId2TaxIds.get(speciesId2GenomeIds.get(dominantSpecies).get(0));
-						for(String taxonId : taxonIds) {
-							outcome += "\t" + taxonId;
-						}
+					outcome += "\t" + dominantPlasmidId + ":" + taxonIds[8];
+					for(int i = 1; i < dominantPlasmidIds.size(); i++) {
+						dominantPlasmidId = dominantPlasmidIds.get(i);
+						outcome += ";" + dominantPlasmidId + ":" + completeGenomeId2TaxIds.get(dominantPlasmidId)[8];
 					}
-				}*/			
-				
-				
+				}
 			}
 			resultQueue.put(outcome);
 		}
-		
-		/*private HashMap<Integer, Float> processTopScores(TreeMap<Float, MutableIntList> topScores) {
-			HashMap<Integer, Float> votingGenomes2Scores = new HashMap<>();
-			Entry<Float, MutableIntList> greatestEntry = topScores.pollLastEntry();
-			float score = greatestEntry.getKey();
-			MutableIntIterator it = greatestEntry.getValue().intIterator();
-			while(it.hasNext()) {
-				votingGenomes2Scores.put(it.next(), score);
-			}
-			
-			float prevScore = greatestEntry.getKey();
-			while(!topScores.isEmpty()) {
-				Entry<Float, MutableIntList> curEntry = topScores.pollLastEntry();
-				float curScore = curEntry.getKey();
-				if(prevScore - curScore > delta) {
-					break;
-				} else {
-					score = curEntry.getKey();
-					it = curEntry.getValue().intIterator();
-					while(it.hasNext()) {
-						votingGenomes2Scores.put(it.next(), score);
-					}
-					prevScore = curScore;
-				}
-			}
-			
-			return votingGenomes2Scores;
-		}*/
 		
 		private MutableIntList processTopScores(TreeMap<Float, MutableIntList> topScores) {
 			MutableIntList votingGenomes = new IntArrayList();
@@ -444,7 +426,7 @@ public class ME_MNBCClassify {
 			while(!topScores.isEmpty()) {
 				Entry<Float, MutableIntList> curEntry = topScores.pollLastEntry();
 				float curScore = curEntry.getKey();
-				if(prevScore - curScore > delta) {
+				if(prevScore - curScore >= delta) {
 					break;
 				} else {
 					votingGenomes.addAll(curEntry.getValue());
@@ -458,7 +440,7 @@ public class ME_MNBCClassify {
 		private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIds(ArrayList<String> prokOrViralGenomes) {			
 			HashMap<String, ArrayList<String>> speciesId2GenomeIds = new HashMap<>();
 			for(String genomeId : prokOrViralGenomes) {
-				String speciesId = completeGenomeId2TaxIds.get(genomeId)[0];
+				String speciesId = completeGenomeId2TaxIds.get(genomeId)[1];
 				if(speciesId2GenomeIds.containsKey(speciesId)) {
 					speciesId2GenomeIds.get(speciesId).add(genomeId);
 				} else {
@@ -718,26 +700,26 @@ public class ME_MNBCClassify {
 				
 				if(readType) {
 					BufferedReader reader2 = null;
-					if(startPath.endsWith(".gz")) {
+					if(endPath.endsWith(".gz")) {
 						reader2 = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(endPath)), "UTF-8"));
 					} else {
 						reader2 = new BufferedReader(new FileReader(endPath));
 					}
 					
-					if(startPath.contains(".fasta")) {
+					if(startPath.contains(".fastq") || startPath.contains(".fq")) {
+						System.out.println("Start reading paired-end FASTQ files " + startPath + " and " + endPath);
+						readTestFragFastqFiles(reader1, reader2);						
+					} else {
 						System.out.println("Start reading paired-end FASTA files " + startPath + " and " + endPath);
 						readTestFragFastaFiles(reader1, reader2);
-					} else {
-						System.out.println("Start reading paired-end FASTQ files " + startPath + " and " + endPath);
-						readTestFragFastqFiles(reader1, reader2);
 					}					
 				} else {				
-					if(startPath.contains(".fasta")) {
+					if(startPath.contains(".fastq") || startPath.contains(".fq")) {
+						System.out.println("Start reading FASTQ file " + startPath);
+						readTestFragFastqFile(reader1);						
+					} else {
 						System.out.println("Start reading FASTA file " + startPath);
 						readTestFragFastaFile(reader1);
-					} else {
-						System.out.println("Start reading FASTQ file " + startPath);
-						readTestFragFastqFile(reader1);
 					}					
 				}
 				
@@ -1022,11 +1004,7 @@ public class ME_MNBCClassify {
 		public String call() {
 			String filename = countFile.getName();
 			String[] fields = filename.split("_");
-			if(filename.contains("plasmid")) {
-				genomeIds[id] = fields[0] + "_" + fields[1] + "_" + fields[2];
-			} else {				
-				genomeIds[id] = fields[0] + "_" + fields[1];
-			}
+			genomeIds[id] = fields[0] + "_" + fields[1];
 			
 			genomeMinimizers[id] = new IntHashSet();
 			try {
@@ -1048,7 +1026,7 @@ public class ME_MNBCClassify {
 	}
 	
 	private static void printHelpInfo() {
-		System.out.println("This MNBC_classify tool (v1.0) classify reads against a reference database.");
+		System.out.println("This MNBC_classify tool (v2.0) classifies reads against a reference database.");
 		System.out.println("-h:	Show this help menu");
 		System.out.println("-k:	K-mer length");
 		System.out.println("-c:	Number of threads");
