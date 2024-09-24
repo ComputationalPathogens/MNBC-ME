@@ -37,7 +37,7 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 	private static String referenceGenomeDirPath;	
 	private static String outputDirPath;
 	private static String previousProgressPath;
-	private static boolean ifPlasmid;
+	private static boolean ifPlasmid = false;
 	
 	public static void main(String[] args) {
 		if(args.length == 1) {
@@ -76,7 +76,7 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 			}
 		}
 		
-		if((k <= 0) || (numberOfThreads == 0) || (referenceGenomeDirPath == null) || (outputDirPath == null)) {
+		if((k <= 0) || (numberOfThreads <= 0) || (referenceGenomeDirPath == null) || (outputDirPath == null)) {
 			System.out.println("Error: not all required parameters are correctly set -- Run 'MNBC build -h' for help");
 			System.exit(0);
 		}
@@ -144,13 +144,13 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 	
 	private static void printHelpInfo() {
 		System.out.println("This MNBC_build tool (v2.0) builds a reference database from a set of sequence files.");
-		System.out.println("-h:	Show this help menu");
-		System.out.println("-k:	K-mer length");
+		System.out.println("-h:	Show this help menu");		
 		System.out.println("-c:	Number of threads");		
 		System.out.println("-i:	Input directory containing the (gzipped) files of reference sequences (e.g. GCF_000009045.1_ASM904v1_genomic.fna.gz is a reference genome sequence file downloaded from RefSeq)");
 		System.out.println("-o:	Exiting output database directory");
-		System.out.println("-p:	Also build plasmid sequences in the reference genomes");
-		System.out.println("-f (optional): Filtering threshold on the chomosome length (an integer >= 0). Chromosomes with lengths below this threshold are skipped. The default value is 0 (i.e. all chromosomes are retained).");
+		System.out.println("-k (optional):	K-mer length (default 15)");
+		System.out.println("-p (optional):	Also build plasmid sequences in the reference genomes");
+		System.out.println("-f (optional): Filtering threshold on the chomosome length (an integer >= 0). Prokaryotic chromosomes with lengths below this threshold are skipped.(default 0: all chromosomes are retained).");
 		System.out.println("-b (optional): Log file of the previous prematurely killed run (i.e. .out file in Slurm). This allows breakpoint resumption after the previous run exits abnormally.");
 	}
 	
@@ -486,8 +486,12 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 					}
 				}			
 				if(chromosomeLength != 0) {
-					if(chromosomeLength >= lengthThreshold) {
-						chromosomes.add(chromosome);
+					if((chromosome.length() - chromosomeLength) == 1) {
+						chromosomes.add(chromosome.delete(0, 1));
+					} else {
+						if(chromosomeLength >= lengthThreshold) {
+							chromosomes.add(chromosome);							
+						}
 					}
 				}
 				if(plasmidLength != 0) {
@@ -499,35 +503,43 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 			} else {
 				while((line = reader.readLine()) != null) {
 					if(line.startsWith(">")) {
-						line = line.toLowerCase();
-
 						if(chromosomeLength != 0) {						
-							if(chromosomeLength >= lengthThreshold) {
-								chromosomes.add(chromosome);							
+							if((chromosome.length() - chromosomeLength) == 1) {
+								chromosomes.add(chromosome.delete(0, 1));
+							} else {
+								if(chromosomeLength >= lengthThreshold) {
+									chromosomes.add(chromosome);							
+								}
 							}
+							
 							chromosomeLength = 0;
 							chromosome = new StringBuilder();				
 						}
-
+						
+						line = line.toLowerCase();
 						if(line.contains("plasmid")) {
-							retain = false;
-							continue;
+							retain = false;							
 						} else {
 							retain = true;
-							continue;
+							if(line.contains("virus")) {
+								chromosome.append("-");
+							}							
 						}
 					} else {
 						if(retain) {
 							line = line.trim();
 							chromosomeLength += line.length();
-							chromosome = chromosome.append(line.toUpperCase());
-							continue;
+							chromosome = chromosome.append(line.toUpperCase());							
 						}
 					}
 				}			
 				if(chromosomeLength != 0) {
-					if(chromosomeLength >= lengthThreshold) {
-						chromosomes.add(chromosome);
+					if((chromosome.length() - chromosomeLength) == 1) {
+						chromosomes.add(chromosome.delete(0, 1));
+					} else {
+						if(chromosomeLength >= lengthThreshold) {
+							chromosomes.add(chromosome);							
+						}
 					}
 				}
 			}
