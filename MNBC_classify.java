@@ -44,7 +44,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 	private static boolean readType; //Whether reads are paired-end
 	private static String startPath;
 	private static String endPath;
-	private static int unclassifiedThreshold = 0; //For a read, when at least (1/unclassifiedThreshold) of read minimizers are shared with a genome, the genome will be taken into account. So if all genomes don't meet this cutoff, the read is unclassified. If set to 0, all genomes are taken into account, every read will be definitely classified
+	private static float unclassifiedThreshold = 0.35F;
 	
 	private static String[] genomeIds;
 	private static float[] logFres;
@@ -86,7 +86,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 						outputFilePath = args[i + 1];
 						break;
 					case 'u':
-						unclassifiedThreshold = Integer.parseInt(args[i + 1]);
+						unclassifiedThreshold = Float.parseFloat(args[i + 1]);
 						break;
 					case 't':
 						readType = args[i + 1].equals("2") ? true : false; //The parameter value itself is "1" or "2"
@@ -102,7 +102,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 			}
 		}
 		
-		if((k <= 0) || (numberOfThreads == 0) || (dbDirPath == null) || (metaFilePath == null) || (outputFilePath == null) || (startPath == null) || (unclassifiedThreshold < 0)) {
+		if((k <= 0) || (numberOfThreads == 0) || (dbDirPath == null) || (metaFilePath == null) || (outputFilePath == null) || (startPath == null) || (unclassifiedThreshold < 0) || (unclassifiedThreshold > 1)) {
 			System.out.println("Error: not all required parameters are correctly set -- Run 'MNBC classify -h' for help");
 			System.exit(0);
 		}
@@ -165,7 +165,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 			PrintWriter writer = null;
 			if(finishedReadIds == null) {
 				writer = new PrintWriter(new FileWriter(outputFilePath), true);
-				writer.println("Read\tType\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tSuperkingdom\tDescription");
+				writer.println("Read\tType\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tSuperkingdom\tCandidateSequences");
 			} else {
 				writer = new PrintWriter(new FileWriter(outputFilePath, true), true);
 			}			
@@ -216,7 +216,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 			String line = reader.readLine();
 			while((line = reader.readLine()) != null) {
 				String[] fields = line.split("\t");
-				completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8], fields[9]});
+				completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8]});
 			}
 			reader.close();
 		} catch(Exception e) {
@@ -287,28 +287,33 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 		private void processReadMinimizers(MutableIntSet readMinimizers) throws Exception {
 			String outcome = read[0];
 			TreeMap<Float, MutableIntList> topScores = new TreeMap<>();
-			if(unclassifiedThreshold == 0) {
+			if(unclassifiedThreshold == 0.0F) {
 				for(int i = 0; i < genomeIds.length; i++) {							
 					float score = 0.0F;
-					
+					int counter = 0; // Number of read minimizers shared with genome
+
 					IntIterator it = readMinimizers.intIterator();
 					while(it.hasNext()) {
 						if(genomeMinimizers[i].contains(it.next())) {
 							score += logFres[i];
+							counter++;
 						} else {
 							score += kmerPenalty;
 						}
 					}
-					
-					if(topScores.containsKey(score)) {
-						topScores.get(score).add(i);
-					} else {
-						MutableIntList genomeIdsWithScore = new IntArrayList();
-						genomeIdsWithScore.add(i);
-						topScores.put(score, genomeIdsWithScore);									
+
+					if(counter > 0) {
+						if(topScores.containsKey(score)) {
+							topScores.get(score).add(i);
+						} else {
+							MutableIntList genomeIdsWithScore = new IntArrayList();
+							genomeIdsWithScore.add(i);
+							topScores.put(score, genomeIdsWithScore);									
+						}
 					}					
 				}
 			} else {
+				int numberOfReadMinimizers = readMinimizers.size();
 				for(int i = 0; i < genomeIds.length; i++) {							
 					float score = 0.0F;
 					int counter = 0; // Number of read minimizers shared with genome
@@ -323,7 +328,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 						}
 					}
 					
-					if((counter * unclassifiedThreshold) >= readMinimizers.size()) { //At lease (1/unclassifiedThreshold) of read minimizers are in genome, genome is taken into account, make classification
+					if(counter >= (numberOfReadMinimizers * unclassifiedThreshold)) { //At lease unclassifiedThreshold ratio of read minimizers are in genome, genome is taken into account, make classification
 						if(topScores.containsKey(score)) {
 							topScores.get(score).add(i);
 						} else {
@@ -333,12 +338,11 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 						}
 					}					
 				}
-				
-				if(topScores.isEmpty()) {
-					outcome += "\tunclassified";
-					resultQueue.put(outcome);
-					return;
-				}
+			}
+			if(topScores.isEmpty()) {
+				outcome += "\tunclassified";
+				resultQueue.put(outcome);
+				return;
 			}
 			
 			MutableIntList votingGenomes = processTopScores(topScores);																		
@@ -349,7 +353,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 				for(int i = 0; i <= 7; i++) {
 					outcome += "\t" + predictedTaxonIds[i];
 				}
-				outcome += "\t" + predictedGenomeId + ":" + predictedTaxonIds[8];
+				outcome += "\t" + predictedGenomeId/* + ":" + predictedTaxonIds[8]*/;
 			} else {
 				//System.out.println("Read " + read[0] + " has " + votingGenomes.size() + " voting genomes");
 				ArrayList<String> prokOrViralGenomes = new ArrayList<String>();
@@ -383,10 +387,11 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 					for(int i = 0; i <= 7; i++) {
 						outcome += "\t" + taxonIds[i];
 					}
-					outcome += "\t" + dominantGenomeId + ":" + taxonIds[8];
+					outcome += "\t" + dominantGenomeId/* + ":" + taxonIds[8]*/;
 					for(int i = 1; i < dominantGenomeIds.size(); i++) {
-						dominantGenomeId = dominantGenomeIds.get(i);
-						outcome += ";" + dominantGenomeId + ":" + completeGenomeId2TaxIds.get(dominantGenomeId)[8];
+						outcome += ";" + dominantGenomeIds.get(i);
+						/*dominantGenomeId = dominantGenomeIds.get(i);
+						outcome += ";" + dominantGenomeId + ":" + completeGenomeId2TaxIds.get(dominantGenomeId)[8]*/;
 					}
 				} else /*if(prokOrViralGenomes.size() < plasmids.size())*/ {
 					HashMap<String, ArrayList<String>> speciesId2PlasmidIds = fillSpeciesId2GenomeIds(plasmids);								
@@ -399,7 +404,7 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 							dominantCount = count;
 						}
 					}
-					//System.out.println("Dominant species is " + dominantSpecies + " with " + dominantCount + " genomes");
+					//System.out.println("Dominant species is " + dominantSpecies + " with " + dominantCount + " plasmids");
 				
 					ArrayList<String> dominantPlasmidIds = speciesId2PlasmidIds.get(dominantSpecies);
 					String dominantPlasmidId = dominantPlasmidIds.get(0);
@@ -407,10 +412,11 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 					for(int i = 0; i <= 7; i++) {
 						outcome += "\t" + taxonIds[i];						
 					}
-					outcome += "\t" + dominantPlasmidId + ":" + taxonIds[8];
+					outcome += "\t" + dominantPlasmidId/* + ":" + taxonIds[8]*/;
 					for(int i = 1; i < dominantPlasmidIds.size(); i++) {
-						dominantPlasmidId = dominantPlasmidIds.get(i);
-						outcome += ";" + dominantPlasmidId + ":" + completeGenomeId2TaxIds.get(dominantPlasmidId)[8];
+						outcome += ";" + dominantPlasmidIds.get(i);
+						/*dominantPlasmidId = dominantPlasmidIds.get(i);
+						outcome += ";" + dominantPlasmidId + ":" + completeGenomeId2TaxIds.get(dominantPlasmidId)[8]*/;
 					}
 				}
 			}
