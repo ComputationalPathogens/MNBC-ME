@@ -150,7 +150,7 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 		System.out.println("-o:	Exiting output database directory");
 		System.out.println("-k (optional):	K-mer length (default 15)");
 		System.out.println("-p (optional):	Also build plasmid sequences in the reference genomes");
-		System.out.println("-f (optional): Filtering threshold on the chomosome length (an integer >= 0). Prokaryotic chromosomes with lengths below this threshold are skipped.(default 0: all chromosomes are retained).");
+		System.out.println("-f (optional): Filtering threshold on the sequence length (an integer >= 0). Sequences with lengths below this threshold are skipped.(default 0: all sequences are retained).");
 		System.out.println("-b (optional): Log file of the previous prematurely killed run (i.e. .out file in Slurm). This allows breakpoint resumption after the previous run exits abnormally.");
 	}
 	
@@ -442,23 +442,18 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 				
 				while((line = reader.readLine()) != null) {
 					if(line.startsWith(">")) {						
-						if(chromosomeLength != 0) {
-							if((chromosome.length() - chromosomeLength) == 1) {
-								chromosomes.add(chromosome.delete(0, 1));
-							} else {
-								if(chromosomeLength >= lengthThreshold) {
-									chromosomes.add(chromosome);							
-								}
-							}
-							
+						if(chromosomeLength != 0) {							
+							if(chromosomeLength >= lengthThreshold) {
+								chromosomes.add(chromosome);							
+							}							
 							chromosomeLength = 0;
 							chromosome = new StringBuilder();				
 						}
 						if(plasmidLength != 0) {
-							//if(plasmidLength >= lengthThreshold) {
+							if(plasmidLength >= lengthThreshold) {
 								plasmids.add(plasmid);
 								plasmidIds.add(plasmidId);
-							//}							
+							}							
 							plasmidLength = 0;
 							plasmid = new StringBuilder();
 							plasmidId = "";
@@ -469,10 +464,7 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 							retain = false;
 							plasmidId = line.split("\\s+")[0].substring(1);;
 						} else {
-							retain = true;
-							if(line.contains("virus")) {
-								chromosome.append("-");
-							}
+							retain = true;							
 						}
 					} else {						
 						line = line.trim();
@@ -485,33 +477,24 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 						}						
 					}
 				}			
-				if(chromosomeLength != 0) {
-					if((chromosome.length() - chromosomeLength) == 1) {
-						chromosomes.add(chromosome.delete(0, 1));
-					} else {
-						if(chromosomeLength >= lengthThreshold) {
-							chromosomes.add(chromosome);							
-						}
-					}
+				if(chromosomeLength != 0) {					
+					if(chromosomeLength >= lengthThreshold) {
+						chromosomes.add(chromosome);							
+					}					
 				}
 				if(plasmidLength != 0) {
-					//if(plasmidLength >= lengthThreshold) {
+					if(plasmidLength >= lengthThreshold) {
 						plasmids.add(plasmid);
 						plasmidIds.add(plasmidId);
-					//}
+					}
 				}
 			} else {
 				while((line = reader.readLine()) != null) {
 					if(line.startsWith(">")) {
-						if(chromosomeLength != 0) {						
-							if((chromosome.length() - chromosomeLength) == 1) {
-								chromosomes.add(chromosome.delete(0, 1));
-							} else {
-								if(chromosomeLength >= lengthThreshold) {
-									chromosomes.add(chromosome);							
-								}
-							}
-							
+						if(chromosomeLength != 0) {							
+							if(chromosomeLength >= lengthThreshold) {
+								chromosomes.add(chromosome);							
+							}							
 							chromosomeLength = 0;
 							chromosome = new StringBuilder();				
 						}
@@ -521,9 +504,6 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 							retain = false;							
 						} else {
 							retain = true;
-							if(line.contains("virus")) {
-								chromosome.append("-");
-							}							
 						}
 					} else {
 						if(retain) {
@@ -533,14 +513,10 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 						}
 					}
 				}			
-				if(chromosomeLength != 0) {
-					if((chromosome.length() - chromosomeLength) == 1) {
-						chromosomes.add(chromosome.delete(0, 1));
-					} else {
-						if(chromosomeLength >= lengthThreshold) {
-							chromosomes.add(chromosome);							
-						}
-					}
+				if(chromosomeLength != 0) {					
+					if(chromosomeLength >= lengthThreshold) {
+						chromosomes.add(chromosome);							
+					}					
 				}
 			}
 			reader.close();			
