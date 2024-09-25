@@ -1033,13 +1033,13 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 	
 	private static void printHelpInfo() {
 		System.out.println("This MNBC_classify tool (v2.0) classifies reads against a reference database.");
-		System.out.println("-h:	Show this help menu");
-		System.out.println("-k:	K-mer length");
+		System.out.println("-h:	Show this help menu");		
 		System.out.println("-c:	Number of threads");
 		System.out.println("-d:	Input database directory");
 		System.out.println("-m:	Input taxonomy file");
 		System.out.println("-o:	Output classification file");
 		System.out.println("-t:	Type of reads (paired-end: 2, single-end: 1). Paired-end reads have two following (gzipped) .fasta/.fastq files. Single-end reads have one following (gzipped) .fasta/.fastq file.");
+		System.out.println("-k (optional):	K-mer length (default 15)");
 		System.out.println("-p (optional): Penalty for absent minimizers (default -2000)");
 		System.out.println("-e (optional): Threshold on the difference between adjacent scores (default 1500)");
 	}

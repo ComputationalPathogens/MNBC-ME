@@ -121,7 +121,7 @@ public class MNBC_taxonomy { //Add the option to simultaneously write taxonomy i
 								for(String rank : ranks) {
 									row += "\t" + rank;
 								}
-								row += "\tFrom" + assemblyID + "\n";
+								row += "\tFrom " + assemblyID + "\n";
 								writer.print(row);
 							}
 						}
