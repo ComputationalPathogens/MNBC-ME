@@ -1010,7 +1010,11 @@ public class MNBC_classify { //Previously called MNBC_classify2_onlydelta1000
 		public String call() {
 			String filename = countFile.getName();
 			String[] fields = filename.split("_");
-			genomeIds[id] = fields[0] + "_" + fields[1];
+			if(fields.length == 2) {
+				genomeIds[id] = fields[0];
+			} else {
+				genomeIds[id] = fields[0] + "_" + fields[1];
+			}			
 			
 			genomeMinimizers[id] = new IntHashSet();
 			try {
