@@ -43,7 +43,8 @@ public class MNBC_classify2 {
 	private static String[] genomeIds;
 	private static float[] logFres;
 	private static MutableIntSet[] genomeMinimizers;
-	private static HashMap<String, String[]> completeGenomeId2TaxIds;	
+	//private static HashMap<String, String[]> completeGenomeId2TaxIds;
+	private static HashMap<String, String> completeGenomeId2Type;
 	private static HashSet<String> finishedReadIds;
 	private static BlockingQueue<String[]> readQueue; //Balance producer and consumers
 	private static BlockingQueue<String> resultQueue; //Balance consumers and writer
@@ -145,7 +146,7 @@ public class MNBC_classify2 {
 		long endTime = System.nanoTime();
 		System.out.println("Read DB in " + + ((endTime - startTime) / 1000000000) + " seconds");
 		
-		completeGenomeId2TaxIds = readCompleteMeta(metaFilePath);
+		completeGenomeId2Type = readCompleteMeta();
 		
 		new Thread(new Producer()).start();
 		
@@ -202,15 +203,17 @@ public class MNBC_classify2 {
 		}
 	}
 	
-	private static HashMap<String, String[]> readCompleteMeta(String completeMetaFilePath) {
-		HashMap<String, String[]> completeGenomeId2TaxIds = new HashMap<String, String[]>();
+	private static /*HashMap<String, String[]>*/ HashMap<String, String> readCompleteMeta() {
+		//HashMap<String, String[]> completeGenomeId2TaxIds = new HashMap<String, String[]>();
+		HashMap<String, String> completeGenomeId2Type = new HashMap<String, String>();
 		
 		try {
-			BufferedReader reader = new BufferedReader(new FileReader(completeMetaFilePath));
+			BufferedReader reader = new BufferedReader(new FileReader(metaFilePath));
 			String line = reader.readLine();
 			while((line = reader.readLine()) != null) {
 				String[] fields = line.split("\t");
-				completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8]});
+				//completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8]});
+				completeGenomeId2Type.put(fields[0], fields[1]);
 			}
 			reader.close();
 		} catch(Exception e) {
@@ -219,7 +222,8 @@ public class MNBC_classify2 {
 			System.exit(1);
 		}
 		
-		return completeGenomeId2TaxIds;
+		//return completeGenomeId2TaxIds;
+		return completeGenomeId2Type;
 	}
 	
 	private static class Consumer implements Runnable {
@@ -342,8 +346,9 @@ public class MNBC_classify2 {
 			MutableIntList votingGenomes = processTopScores(topScores);																		
 			if(votingGenomes.size() == 1) {
 				String predictedGenomeId = genomeIds[votingGenomes.getFirst()];
-				String[] predictedTaxonIds = completeGenomeId2TaxIds.get(predictedGenomeId);
-				outcome += "\t" + predictedTaxonIds[0] + "\t" + predictedGenomeId;
+				//String[] predictedTaxonIds = completeGenomeId2Type.get(predictedGenomeId);
+				//outcome += "\t" + predictedTaxonIds[0] + "\t" + predictedGenomeId;
+				outcome += "\t" + completeGenomeId2Type.get(predictedGenomeId) + "\t" + predictedGenomeId;
 			} else {
 				int plasmidCount = 0;
 				int virusCount = 0;
@@ -351,7 +356,8 @@ public class MNBC_classify2 {
 				MutableIntIterator it = votingGenomes.intIterator();
 				while(it.hasNext()) {
 					String genomeId = genomeIds[it.next()];
-					String type = completeGenomeId2TaxIds.get(genomeId)[0];
+					//String type = completeGenomeId2Type.get(genomeId)[0];
+					String type = completeGenomeId2Type.get(genomeId);
 					if(type.equals("plasmid")) {
 						plasmidCount++;						
 					} else if(type.equals("virus")){
@@ -392,10 +398,10 @@ public class MNBC_classify2 {
 			return votingGenomes;
 		}
 		
-		private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIds(ArrayList<String> prokOrViralGenomes) {			
+		/*private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIds(ArrayList<String> prokOrViralGenomes) {			
 			HashMap<String, ArrayList<String>> speciesId2GenomeIds = new HashMap<>();
 			for(String genomeId : prokOrViralGenomes) {
-				String speciesId = completeGenomeId2TaxIds.get(genomeId)[1];
+				String speciesId = completeGenomeId2Type.get(genomeId)[1];
 				if(speciesId2GenomeIds.containsKey(speciesId)) {
 					speciesId2GenomeIds.get(speciesId).add(genomeId);
 				} else {
@@ -406,7 +412,7 @@ public class MNBC_classify2 {
 			}
 			
 			return speciesId2GenomeIds;
-		}
+		}*/
 		
 		private void addKmersOfOneTestFrag(String testFrag, MutableIntSet kmers) {
 			int length = testFrag.length();
