@@ -350,29 +350,38 @@ public class MNBC_classify2 {
 				//outcome += "\t" + predictedTaxonIds[0] + "\t" + predictedGenomeId;
 				outcome += "\t" + completeGenomeId2Type.get(predictedGenomeId) + "\t" + predictedGenomeId;
 			} else {
-				int plasmidCount = 0;
-				int virusCount = 0;
-				int chroCount = 0;
+				ArrayList<String> plasmid = new ArrayList<>();
+				ArrayList<String> virus = new ArrayList<>();
+				ArrayList<String> chro = new ArrayList<>();
 				MutableIntIterator it = votingGenomes.intIterator();
 				while(it.hasNext()) {
 					String genomeId = genomeIds[it.next()];
 					//String type = completeGenomeId2Type.get(genomeId)[0];
 					String type = completeGenomeId2Type.get(genomeId);
 					if(type.equals("plasmid")) {
-						plasmidCount++;						
+						plasmid.add(genomeId);						
 					} else if(type.equals("virus")){
-						virusCount++;						
+						virus.add(genomeId);						
 					} else {
-						chroCount++;
+						chro.add(genomeId);
 					}
 				}
 				
-				if((plasmidCount >= virusCount) && (plasmidCount >= chroCount)) {
-					outcome += "\tplasmid\t" + plasmidCount;
-				} else if((virusCount >= plasmidCount) && (virusCount >= chroCount)) {
-					outcome += "\tvirus\t" + virusCount;
+				if((plasmid.size() >= virus.size()) && (plasmid.size() >= chro.size())) {
+					outcome += "\tplasmid\t" + plasmid.get(0);
+					for(int i = 1; i < plasmid.size(); i++) {
+						outcome += ";" + plasmid.get(i);
+					}
+				} else if((virus.size() >= plasmid.size()) && (virus.size() >= chro.size())) {
+					outcome += "\tvirus\t" + virus.size();
+					for(int i = 1; i < virus.size(); i++) {
+						outcome += ";" + virus.get(i);
+					}
 				} else {
-					outcome += "\tchromosome\t" + chroCount;
+					outcome += "\tchromosome\t" + chro.size();
+					for(int i = 1; i < chro.size(); i++) {
+						outcome += ";" + chro.get(i);
+					}
 				}
 			}
 			resultQueue.put(outcome);
