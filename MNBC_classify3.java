@@ -420,7 +420,7 @@ public class MNBC_classify3 {
 					outcome += ";" + plasmid.get(i);
 				}
 			}*/
-			resultQueue.put(scores);
+			resultQueue.put(new Object[] {read[0], scores});
 		}
 		
 		private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIdsPlas(ArrayList<String>... lists) {
