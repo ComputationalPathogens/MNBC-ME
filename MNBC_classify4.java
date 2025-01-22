@@ -27,7 +27,7 @@ import org.eclipse.collections.api.set.primitive.MutableIntSet;
 import org.eclipse.collections.impl.list.mutable.primitive.IntArrayList;
 import org.eclipse.collections.impl.set.mutable.primitive.IntHashSet;
 
-public class MNBC_classify3 {
+public class MNBC_classify4 {
 	private static int k = 15;
 	private static int numberOfThreads;
 	private static float kmerPenalty = -2000.0F;
@@ -40,13 +40,13 @@ public class MNBC_classify3 {
 	private static String endPath;
 	private static float unclassifiedThreshold = 0.35F;
 	
-	private static String[] genomeIds;
-	private static float[] logFres;
-	private static MutableIntSet[] genomeMinimizers;
+	private static ArrayList<String> genomeIds;
+	private static ArrayList<Float> logFres;
+	private static ArrayList<MutableIntSet> genomeMinimizers;
 	private static HashMap<String, String[]> completeGenomeId2TaxIds;
 	private static HashSet<String> finishedReadIds;
 	private static BlockingQueue<String[]> readQueue; //Balance producer and consumers
-	private static BlockingQueue<String> resultQueue; //Balance consumers and writer
+	private static BlockingQueue<Object[]> resultQueue; //Balance consumers and writer
 	private static AtomicInteger erroredConsumerCount = new AtomicInteger();
 	
 	public static void main(String[] args) {
@@ -101,15 +101,16 @@ public class MNBC_classify3 {
 			System.exit(0);
 		}
 		
-		long startTime = System.nanoTime();		
-		int numberOfCores = Runtime.getRuntime().availableProcessors();
+		long startTime = System.nanoTime();
+		Runtime runtime = Runtime.getRuntime();
+		int numberOfCores = runtime.availableProcessors();
 		System.out.println("Number of available cores: " + numberOfCores);
 		if(numberOfThreads > numberOfCores) {
 			System.out.println("WARNING - Number of available cores " + numberOfCores + " is less than requested number of threads " + numberOfThreads + ", exiting");
 			System.exit(1);
 		}
-		readQueue = new ArrayBlockingQueue<String[]>(numberOfThreads + 10);
-		resultQueue = new ArrayBlockingQueue<String>(numberOfThreads + 10);
+		readQueue = new ArrayBlockingQueue<String[]>(numberOfThreads + 5);
+		resultQueue = new ArrayBlockingQueue<Object[]>(numberOfThreads + 5);
 		
 		File outputFile = new File(outputFilePath);
 		if(outputFile.exists()) {			
@@ -117,68 +118,194 @@ public class MNBC_classify3 {
 			System.out.println(finishedReadIds.size() + " reads have finished previously");
 		}
 		
-		File[] countFiles = new File(dbDirPath).listFiles();
-		genomeIds = new String[countFiles.length];
-		logFres = new float[countFiles.length];
-		genomeMinimizers = new MutableIntSet[countFiles.length];
-		
-		ExecutorService nested = Executors.newFixedThreadPool(numberOfCores - 1);
-		CompletionService<String> pool = new ExecutorCompletionService<String>(nested);
-		for(int i = 0; i < countFiles.length; i++) {
-			pool.submit(new DBReader(countFiles[i], i));
-		}
-		
-		for(int i = 0; i < countFiles.length; i++) {
-			try {
-				String outcome = pool.take().get();
-				if(outcome.contains("ERROR")) {
-					System.out.println(i + "th task failed (" + outcome + "), exiting");
-					System.exit(1);
-				}
-			} catch(Exception e) {
-				System.out.println("Exception on " + i + " th returned task, exiting");
-				e.printStackTrace();
-				System.exit(1);
-			}
-		}		
-		nested.shutdown();
-		long endTime = System.nanoTime();
-		System.out.println("Read DB in " + + ((endTime - startTime) / 1000000000) + " seconds");
-		
 		completeGenomeId2TaxIds = readCompleteMeta();
 		
-		new Thread(new Producer()).start();
+		File[] countFiles = new File(dbDirPath).listFiles();
+		boolean[] used = new boolean[countFiles.length];
+		int usedCount = 0;
+		/*genomeIds = new String[countFiles.length];
+		logFres = new float[countFiles.length];
+		genomeMinimizers = new MutableIntSet[countFiles.length];*/
+		genomeIds = new ArrayList<>();
+		logFres = new ArrayList<>();
+		genomeMinimizers = new ArrayList<>();
 		
-		for(int i = 0; i < numberOfThreads; i++) {
-			new Thread(new Consumer(i)).start();
-		}
-		System.out.println("Start classifying");
-		
-		int completedConsumerCounter = 0;
-		try {
-			PrintWriter writer = null;
+		PrintWriter writer = null;
+		try {			
 			if(finishedReadIds == null) {
 				writer = new PrintWriter(new FileWriter(outputFilePath), true);
 				writer.println("Read\tType\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tKingdom\tSuperkingdom\tCandidates");
 			} else {
 				writer = new PrintWriter(new FileWriter(outputFilePath, true), true);
 			}			
-			
-			while((completedConsumerCounter + erroredConsumerCount.get()) < numberOfThreads) {
-				String outcome = resultQueue.take();
-				if(outcome.endsWith("- finished")) {
-					completedConsumerCounter++;
-				} else {
-					writer.println(outcome);
-				}
-			}
-			writer.close();
 		} catch(Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
 		
-		endTime = System.nanoTime();
+		int batch = 1;
+		do {
+			System.out.println("*****DB batch " + batch + "*****");
+			genomeIds.clear();
+			logFres.clear();
+			genomeMinimizers.clear();
+			
+			ExecutorService nested = Executors.newFixedThreadPool(numberOfCores - 1);
+			CompletionService<Object[]> pool = new ExecutorCompletionService<Object[]>(nested);
+			for(int i = 0; i < countFiles.length; i++) {
+				if(!used[i]) {
+					pool.submit(new DBReader(countFiles[i]));
+				}
+			}
+
+			long dbMemoryLimit = runtime.maxMemory() * 4 / 5;
+			for(int i = 0; i < countFiles.length; i++) {
+				try {
+					Object[] outcome = pool.take().get();
+					if(outcome.length == 1) {
+						System.out.println(i + "th task failed (" + outcome[0] + "), exiting");
+						System.exit(1);
+					}
+
+					genomeIds.add((String) outcome[0]);
+					logFres.add((float) outcome[1]);
+					genomeMinimizers.add((MutableIntSet) outcome[1]);
+					used[i] = true;
+					usedCount++;
+
+					if((runtime.totalMemory() - runtime.freeMemory()) >= dbMemoryLimit) {
+						break;
+					}
+				} catch(Exception e) {
+					System.out.println("Exception on " + i + " th returned task, exiting");
+					e.printStackTrace();
+					System.exit(1);
+				}
+			}		
+			nested.shutdown();
+			System.out.println("Read " + usedCount + " DB files so far");
+			/*long endTime = System.nanoTime();
+			System.out.println("Read DB in " + + ((endTime - startTime) / 1000000000) + " seconds");*/
+			
+			if(batch == 1) {
+				if(usedCount == countFiles.length) {
+					
+					writer.close();
+					long endTime = System.nanoTime();
+					System.out.println("done in " + ((endTime - startTime) / 1000000000) + " seconds");
+					System.exit(0);
+				}
+			}
+
+			PrintWriter writerTemp = null;
+			try {				
+				writerTemp = new PrintWriter(new FileWriter("Batch" + (batch++) + ".txt"), true);
+				writerTemp.print(genomeIds.get(0));
+				for(int i = 1; i < genomeIds.size(); i++) {
+					writerTemp.print("," + genomeIds.get(i));
+				}
+				writerTemp.println();
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+			
+			new Thread(new Producer()).start();
+
+			for(int i = 0; i < numberOfThreads; i++) {
+				new Thread(new Consumer(i)).start();
+			}
+			System.out.println("Start classifying");
+
+			int completedConsumerCounter = 0;
+			try {
+				while((completedConsumerCounter + erroredConsumerCount.get()) < numberOfThreads) {
+					Object[] outcome = resultQueue.take();
+					String info = (String) outcome[0];
+					if(outcome.length == 1) {						
+						if(info.endsWith("- finished")) {
+							completedConsumerCounter++;
+						} else if(batch == 1) {
+							writer.println(outcome[0] + "\tunclassified");
+						}
+					} else {
+						writerTemp.println("Read " + info);
+						for(Entry<Float, MutableIntList> entry : ((TreeMap<Float, MutableIntList>) outcome[1]).entrySet()) {
+							writerTemp.print(entry.getKey() + ":");
+							IntIterator it = entry.getValue().intIterator();
+							writerTemp.print(it.next());
+							while(it.hasNext()) {
+								writerTemp.print("," + it.next());
+							}
+							writerTemp.println();
+						}
+					}
+					/*if(outcome.endsWith("- finished")) {
+						completedConsumerCounter++;
+					} else {
+						writer.println(outcome);
+					}*/
+				}
+				writerTemp.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		} while(usedCount < countFiles.length);
+		
+		HashMap<String, TreeMap<Float, ArrayList<String>>> read2Score2Genomes= new HashMap<>();
+		String currentRead = null;
+		TreeMap<Float, ArrayList<String>> currentScore2Genomes = null;		
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader("Batch" + 1 + ".txt"));	
+			String line = reader.readLine();
+			String[] allGenomes = line.split(",");
+			
+			while((line = reader.readLine()) != null) {
+				if(line.startsWith("Read")) {
+					if(currentRead != null) {
+						read2Score2Genomes.put(currentRead, currentScore2Genomes);
+					}
+					
+					currentRead = line.split("\\s+")[1];
+					currentScore2Genomes = new TreeMap<>();					
+				} else {
+					String[] fields = line.split(":");
+					String[] indices = fields[1].split(",");
+					ArrayList<String> genomes = new ArrayList<>();
+					for(String index : indices) {
+						genomes.add(allGenomes[Integer.parseInt(index)]);
+					}
+					currentScore2Genomes.put(Float.parseFloat(fields[0]), genomes);
+				}
+			}
+			if(currentRead != null) {
+				read2Score2Genomes.put(currentRead, currentScore2Genomes);
+			}
+			reader.close();
+		} catch(Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
+		for(int i = 2; i < batch; i++) {			
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader("Batch" + i + ".txt"));
+				while((line = reader.readLine()) != null) {
+					if(line.startsWith("Read")) {
+						currentRead = line.split("\\s+")[1];
+						
+					}
+				}
+				reader.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		}
+		
+		writer.close();
+		long endTime = System.nanoTime();
 		System.out.println("done in " + ((endTime - startTime) / 1000000000) + " seconds");
 	}
 	
@@ -203,14 +330,14 @@ public class MNBC_classify3 {
 	}
 	
 	private static HashMap<String, String[]> readCompleteMeta() {
-		HashMap<String, String[]> completeGenomeId2TaxIds = new HashMap<>();
+		HashMap<String, String[]> completeGenomeId2TaxIds = new HashMap<String, String[]>();
 		
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader(metaFilePath));
 			String line = reader.readLine();
 			while((line = reader.readLine()) != null) {
 				String[] fields = line.split("\t");
-				completeGenomeId2TaxIds.put(fields[0], new String[]{fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8], fields[9]});
+				completeGenomeId2TaxIds.put(fields[0], new String[] {fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7], fields[8], fields[9]});
 			}
 			reader.close();
 		} catch(Exception e) {
@@ -219,6 +346,7 @@ public class MNBC_classify3 {
 			System.exit(1);
 		}
 		
+		//return completeGenomeId2TaxIds;
 		return completeGenomeId2TaxIds;
 	}
 	
@@ -240,14 +368,14 @@ public class MNBC_classify3 {
 						read = readQueue.take();
 						if(read.length == 0) {
 							readQueue.put(read);						
-							resultQueue.put("Consumer " + id + " - finished");
+							resultQueue.put(new Object[] {"Consumer " + id + " - finished"});
 							done = true;
 						} else {
 							MutableIntSet readMinimizers = new IntHashSet();							
 							addKmersOfOneTestFrag(read[1], readMinimizers);
 							addKmersOfOneTestFrag(read[2], readMinimizers);
 							if(readMinimizers.isEmpty()) {
-								resultQueue.put(read[0] + "\tunclassified");
+								resultQueue.put(new Object[] {read[0]});
 								continue;
 							}
 							processReadMinimizers(readMinimizers);
@@ -258,13 +386,13 @@ public class MNBC_classify3 {
 						read = readQueue.take();
 						if(read.length == 0) {
 							readQueue.put(read);						
-							resultQueue.put("Consumer " + id + " - finished");
+							resultQueue.put(new Object[] {"Consumer " + id + " - finished"});
 							done = true;
 						} else {
 							MutableIntSet readMinimizers = new IntHashSet();							
 							addKmersOfOneTestFrag(read[1], readMinimizers);
 							if(readMinimizers.isEmpty()) {
-								resultQueue.put(read[0] + "\tunclassified");
+								resultQueue.put(new Object[] {read[0]});
 								continue;
 							}							
 							processReadMinimizers(readMinimizers);
@@ -279,17 +407,19 @@ public class MNBC_classify3 {
 		}
 		
 		private void processReadMinimizers(MutableIntSet readMinimizers) throws Exception {
-			String outcome = read[0];
-			TreeMap<Float, MutableIntList> topScores = new TreeMap<>();
+			//String outcome = read[0];
+			TreeMap<Float, MutableIntList> scores = new TreeMap<>();
 			if(unclassifiedThreshold == 0.0F) {
-				for(int i = 0; i < genomeIds.length; i++) {							
+				for(int i = 0; i < genomeIds.size(); i++) {							
 					float score = 0.0F;
 					int counter = 0; // Number of read minimizers shared with genome
-
+					
+					MutableIntSet genomeMinimizer = genomeMinimizers.get(i);
+					float logFre = logFres.get(i);
 					IntIterator it = readMinimizers.intIterator();
 					while(it.hasNext()) {
-						if(genomeMinimizers[i].contains(it.next())) {
-							score += logFres[i];
+						if(genomeMinimizer.contains(it.next())) {
+							score += logFre;
 							counter++;
 						} else {
 							score += kmerPenalty;
@@ -297,25 +427,27 @@ public class MNBC_classify3 {
 					}
 
 					if(counter > 0) {
-						if(topScores.containsKey(score)) {
-							topScores.get(score).add(i);
+						if(scores.containsKey(score)) {
+							scores.get(score).add(i);
 						} else {
 							MutableIntList genomeIdsWithScore = new IntArrayList();
 							genomeIdsWithScore.add(i);
-							topScores.put(score, genomeIdsWithScore);									
+							scores.put(score, genomeIdsWithScore);									
 						}
 					}					
 				}
 			} else {
 				int numberOfReadMinimizers = readMinimizers.size();
-				for(int i = 0; i < genomeIds.length; i++) {							
+				for(int i = 0; i < genomeIds.size(); i++) {							
 					float score = 0.0F;
 					int counter = 0; // Number of read minimizers shared with genome
 
+					MutableIntSet genomeMinimizer = genomeMinimizers.get(i);
+					float logFre = logFres.get(i);
 					IntIterator it = readMinimizers.intIterator();
 					while(it.hasNext()) {
-						if(genomeMinimizers[i].contains(it.next())) {
-							score += logFres[i];
+						if(genomeMinimizer.contains(it.next())) {
+							score += logFre;
 							counter++;
 						} else {
 							score += kmerPenalty;
@@ -323,17 +455,17 @@ public class MNBC_classify3 {
 					}
 					
 					if(counter >= (numberOfReadMinimizers * unclassifiedThreshold)) { //At lease unclassifiedThreshold ratio of read minimizers are in genome, genome is taken into account, make classification
-						if(topScores.containsKey(score)) {
-							topScores.get(score).add(i);
+						if(scores.containsKey(score)) {
+							scores.get(score).add(i);
 						} else {
 							MutableIntList genomeIdsWithScore = new IntArrayList();
 							genomeIdsWithScore.add(i);
-							topScores.put(score, genomeIdsWithScore);									
+							scores.put(score, genomeIdsWithScore);									
 						}
 					}					
 				}
 			}
-			if(topScores.isEmpty()) {
+			/*if(scores.isEmpty()) {
 				outcome += "\tunclassified";
 				resultQueue.put(outcome);
 				return;
@@ -365,11 +497,11 @@ public class MNBC_classify3 {
 				
 				HashMap<String, ArrayList<String>> speciesId2GenomeIds = null;
 				if((plasmid.size() >= virus.size()) && (plasmid.size() >= chro.size())) {
-					speciesId2GenomeIds = fillSpeciesId2GenomeIds(plasmid);
+					speciesId2GenomeIds = fillSpeciesId2GenomeIdsPlas(plasmid);					
 				} else {
-					speciesId2GenomeIds = fillSpeciesId2GenomeIds(virus, chro);
+					speciesId2GenomeIds = fillSpeciesId2GenomeIdsPlas(virus, chro);					
 				}
-				String dominantSpecies = null;
+				String dominantSpecies = null; //Multiple species may have the same greatest number of genomes
 				int dominantCount = 0;
 				for(Entry<String, ArrayList<String>> species : speciesId2GenomeIds.entrySet()) {
 					int count = species.getValue().size();
@@ -379,18 +511,40 @@ public class MNBC_classify3 {
 					}
 				}
 				
-				 ArrayList<String> dominantGenomes = speciesId2GenomeIds.get(dominantSpecies);
-				 String firstDominantGenome = dominantGenomes.get(0);
-				 String[] taxonIds = completeGenomeId2TaxIds.get(firstDominantGenome);
-				 for(String taxonId : taxonIds) {
-					outcome += "\t" + taxonId;						
-				 }
-				 outcome = outcome + "\t" + firstDominantGenome;
-				 for(int i = 1; i < dominantGenomes.size(); i++) {
-					 outcome = outcome + ";" + dominantGenomes.get(i);
-				 }
+				ArrayList<String> dominantGenomes = speciesId2GenomeIds.get(dominantSpecies);
+				String firstDominantGenome = dominantGenomes.get(0);
+				String[] taxonIds = completeGenomeId2TaxIds.get(firstDominantGenome);
+				for(String taxonId : taxonIds) {
+					outcome += "\t" + taxonId;
+				}
+				outcome += "\t" + firstDominantGenome;
+				for(int i = 1; i < dominantGenomes.size(); i++) {
+					outcome += ";" + dominantGenomes.get(i);
+				}
+				
+				for(int i = 1; i < plasmid.size(); i++) {
+					outcome += ";" + plasmid.get(i);
+				}
+			}*/
+			resultQueue.put(new Object[] {read[0], scores});
+		}
+		
+		private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIdsPlas(ArrayList<String>... lists) {
+			HashMap<String, ArrayList<String>> speciesId2GenomeIds = new HashMap<>();
+			for(ArrayList<String> list : lists) {
+				for(String genomeId : list) {
+					String speciesId = completeGenomeId2TaxIds.get(genomeId)[1];
+					if(speciesId2GenomeIds.containsKey(speciesId)) {
+						speciesId2GenomeIds.get(speciesId).add(genomeId);
+					} else {
+						ArrayList<String> genomeIdsWithSpeciesId = new ArrayList<String>();
+						genomeIdsWithSpeciesId.add(genomeId);
+						speciesId2GenomeIds.put(speciesId, genomeIdsWithSpeciesId);
+					}									
+				}
 			}
-			resultQueue.put(outcome);
+			
+			return speciesId2GenomeIds;
 		}
 		
 		private MutableIntList processTopScores(TreeMap<Float, MutableIntList> topScores) {
@@ -413,24 +567,21 @@ public class MNBC_classify3 {
 			return votingGenomes;
 		}
 		
-		@SafeVarargs
-		private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIds(ArrayList<String>... lists) {			
+		/*private HashMap<String, ArrayList<String>> fillSpeciesId2GenomeIds(ArrayList<String> prokOrViralGenomes) {			
 			HashMap<String, ArrayList<String>> speciesId2GenomeIds = new HashMap<>();
-			for(ArrayList<String> list : lists) {
-				for(String genomeId : list) {
-					String speciesId = completeGenomeId2TaxIds.get(genomeId)[1];
-					if(speciesId2GenomeIds.containsKey(speciesId)) {
-						speciesId2GenomeIds.get(speciesId).add(genomeId);
-					} else {
-						ArrayList<String> genomeIdsWithSpeciesId = new ArrayList<String>();
-						genomeIdsWithSpeciesId.add(genomeId);
-						speciesId2GenomeIds.put(speciesId, genomeIdsWithSpeciesId);
-					}
-				}
+			for(String genomeId : prokOrViralGenomes) {
+				String speciesId = completeGenomeId2Type.get(genomeId)[1];
+				if(speciesId2GenomeIds.containsKey(speciesId)) {
+					speciesId2GenomeIds.get(speciesId).add(genomeId);
+				} else {
+					ArrayList<String> genomeIdsWithSpeciesId = new ArrayList<String>();
+					genomeIdsWithSpeciesId.add(genomeId);
+					speciesId2GenomeIds.put(speciesId, genomeIdsWithSpeciesId);
+				}									
 			}
 			
 			return speciesId2GenomeIds;
-		}
+		}*/
 		
 		private void addKmersOfOneTestFrag(String testFrag, MutableIntSet kmers) {
 			int length = testFrag.length();
@@ -970,41 +1121,41 @@ public class MNBC_classify3 {
 		}
 	}
 	
-	private static class DBReader implements Callable<String> {
+	private static class DBReader implements Callable<Object[]> {
 		private File countFile;
-		private int id;
 		
-		public DBReader(File aFile, int anID) {
+		public DBReader(File aFile) {
 			countFile = aFile;
-			id = anID;
 		}
 
 		@Override
-		public String call() {
+		public Object[] call() {
+			String genomeId = null;
 			String filename = countFile.getName();
 			String[] fields = filename.split("_");
 			if(fields.length == 2) {
-				genomeIds[id] = fields[0];
+				genomeId = fields[0];
 			} else {
-				genomeIds[id] = fields[0] + "_" + fields[1];
+				genomeId = fields[0] + "_" + fields[1];
 			}			
 			
-			genomeMinimizers[id] = new IntHashSet();
+			float logFre = 0.0F;
+			MutableIntSet genomeMinimizer = new IntHashSet();
 			try {
 				BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(countFile)), "UTF-8"));
 				String line = reader.readLine();
-				logFres[id] = (float) Math.log(1.0 / Integer.parseInt(line));				
+				logFre = (float) Math.log(1.0 / Integer.parseInt(line));				
 				
 				while((line = reader.readLine()) != null) {
-					genomeMinimizers[id].add(Integer.parseInt(line));
+					genomeMinimizer.add(Integer.parseInt(line));
 				}
 				reader.close();
 			} catch(Exception e) {
 				e.printStackTrace();
-				return "ERROR: couldn't read " + filename;
+				return new Object[] {"ERROR: couldn't read " + filename};
 			}
 			
-			return "Finished reading " + filename;
+			return new Object[] {genomeId, logFre, genomeMinimizer};
 		}		
 	}
 	
