@@ -109,8 +109,8 @@ public class MNBC_classify3 {
 			System.out.println("WARNING - Number of available cores " + numberOfCores + " is less than requested number of threads " + numberOfThreads + ", exiting");
 			System.exit(1);
 		}
-		readQueue = new ArrayBlockingQueue<String[]>(numberOfThreads + 10);
-		resultQueue = new ArrayBlockingQueue<Object[]>(numberOfThreads + 10);
+		readQueue = new ArrayBlockingQueue<String[]>(numberOfThreads + 5);
+		resultQueue = new ArrayBlockingQueue<Object[]>(numberOfThreads + 5);
 		
 		File outputFile = new File(outputFilePath);
 		if(outputFile.exists()) {			
@@ -130,74 +130,119 @@ public class MNBC_classify3 {
 		logFres = new ArrayList<>();
 		genomeMinimizers = new ArrayList<>();
 		
-		while(usedCount < countFiles.length) {
-		ExecutorService nested = Executors.newFixedThreadPool(numberOfCores - 1);
-		CompletionService<Object[]> pool = new ExecutorCompletionService<Object[]>(nested);
-		for(int i = 0; i < countFiles.length; i++) {
-			if(!used[i]) {
-				pool.submit(new DBReader(countFiles[i]));
-			}
-		}
-		
-		long dbMemoryLimit = runtime.maxMemory() - 53687091200L;
-		for(int i = 0; i < countFiles.length; i++) {
-			try {
-				Object[] outcome = pool.take().get();
-				if(outcome.length == 1) {
-					System.out.println(i + "th task failed (" + outcome[0] + "), exiting");
-					System.exit(1);
-				}
-				
-				genomeIds.add((String) outcome[0]);
-				logFres.add((float) outcome[1]);
-				genomeMinimizers.add((MutableIntSet) outcome[1]);
-				used[i] = true;
-				usedCount++;
-				
-				if((runtime.totalMemory() - runtime.freeMemory()) >= dbMemoryLimit) {
-					break;
-				}
-			} catch(Exception e) {
-				System.out.println("Exception on " + i + " th returned task, exiting");
-				e.printStackTrace();
-				System.exit(1);
-			}
-		}		
-		nested.shutdown();
-		/*long endTime = System.nanoTime();
-		System.out.println("Read DB in " + + ((endTime - startTime) / 1000000000) + " seconds");*/
-		
-		new Thread(new Producer()).start();
-		
-		for(int i = 0; i < numberOfThreads; i++) {
-			new Thread(new Consumer(i)).start();
-		}
-		System.out.println("Start classifying");
-		
-		int completedConsumerCounter = 0;
-		try {
-			PrintWriter writer = null;
+		PrintWriter writer = null;
+		try {			
 			if(finishedReadIds == null) {
 				writer = new PrintWriter(new FileWriter(outputFilePath), true);
 				writer.println("Read\tType\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tKingdom\tSuperkingdom\tCandidates");
 			} else {
 				writer = new PrintWriter(new FileWriter(outputFilePath, true), true);
 			}			
-			
-			while((completedConsumerCounter + erroredConsumerCount.get()) < numberOfThreads) {
-				String outcome = resultQueue.take();
-				if(outcome.endsWith("- finished")) {
-					completedConsumerCounter++;
-				} else {
-					writer.println(outcome);
-				}
-			}
-			writer.close();
 		} catch(Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		}
+		
+		int batch = 1;
+		do {
+			System.out.println("*****DB batch " + batch + "*****");
+			ExecutorService nested = Executors.newFixedThreadPool(numberOfCores - 1);
+			CompletionService<Object[]> pool = new ExecutorCompletionService<Object[]>(nested);
+			for(int i = 0; i < countFiles.length; i++) {
+				if(!used[i]) {
+					pool.submit(new DBReader(countFiles[i]));
+				}
+			}
+
+			long dbMemoryLimit = runtime.maxMemory() * 4 / 5;
+			for(int i = 0; i < countFiles.length; i++) {
+				try {
+					Object[] outcome = pool.take().get();
+					if(outcome.length == 1) {
+						System.out.println(i + "th task failed (" + outcome[0] + "), exiting");
+						System.exit(1);
+					}
+
+					genomeIds.add((String) outcome[0]);
+					logFres.add((float) outcome[1]);
+					genomeMinimizers.add((MutableIntSet) outcome[1]);
+					used[i] = true;
+					usedCount++;
+
+					if((runtime.totalMemory() - runtime.freeMemory()) >= dbMemoryLimit) {
+						break;
+					}
+				} catch(Exception e) {
+					System.out.println("Exception on " + i + " th returned task, exiting");
+					e.printStackTrace();
+					System.exit(1);
+				}
+			}		
+			nested.shutdown();
+			System.out.println("Read " + usedCount + " DB files so far");
+			/*long endTime = System.nanoTime();
+			System.out.println("Read DB in " + + ((endTime - startTime) / 1000000000) + " seconds");*/
+			
+			if(batch == 1) {
+				if(usedCount == countFiles.length) {
+					
+					break;
+				}
+			}
+
+			PrintWriter writerTemp = null;
+			try {				
+				writerTemp = new PrintWriter(new FileWriter("Batch" + batch + ".txt"), true);
+				writerTemp.print(genomeIds.get(0));
+				for(int i = 1; i < genomeIds.size(); i++) {
+					writerTemp.print("," + genomeIds.get(i));
+				}
+				writerTemp.println();
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+			
+			new Thread(new Producer()).start();
+
+			for(int i = 0; i < numberOfThreads; i++) {
+				new Thread(new Consumer(i)).start();
+			}
+			System.out.println("Start classifying");
+
+			int completedConsumerCounter = 0;
+			try {
+				while((completedConsumerCounter + erroredConsumerCount.get()) < numberOfThreads) {
+					Object[] outcome = resultQueue.take();
+					String info = (String) outcome[0];
+					if(outcome.length == 1) {						
+						if(info.endsWith("- finished")) {
+							completedConsumerCounter++;
+						} else if(batch == 1) {
+							writer.println(outcome[0] + "\tunclassified");
+						}
+					} else {
+						writerTemp.println("Read " + info);
+						for(Entry<Float, MutableIntList> entry : ((TreeMap<Float, MutableIntList>) outcome[1]).entrySet()) {
+							writerTemp.print(entry.getKey() + ":");
+							IntIterator it = entry.getValue().intIterator();
+							while(it.hasNext()) {
+								
+							}
+						}
+					}
+					/*if(outcome.endsWith("- finished")) {
+						completedConsumerCounter++;
+					} else {
+						writer.println(outcome);
+					}*/
+				}
+				writer.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		} while(usedCount < countFiles.length);
 		
 		long endTime = System.nanoTime();
 		System.out.println("done in " + ((endTime - startTime) / 1000000000) + " seconds");
