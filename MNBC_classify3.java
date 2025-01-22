@@ -254,12 +254,48 @@ public class MNBC_classify3 {
 		} while(usedCount < countFiles.length);
 		
 		HashMap<String, TreeMap<Float, ArrayList<String>>> read2Score2Genomes= new HashMap<>();
-		for(int i = 1; i < batch; i++) {
+		String currentRead = null;
+		TreeMap<Float, ArrayList<String>> currentScore2Genomes = null;		
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader("Batch" + 1 + ".txt"));	
+			String line = reader.readLine();
+			String[] allGenomes = line.split(",");
+			
+			while((line = reader.readLine()) != null) {
+				if(line.startsWith("Read")) {
+					if(currentRead != null) {
+						read2Score2Genomes.put(currentRead, currentScore2Genomes);
+					}
+					
+					currentRead = line.split("\\s+")[1];
+					currentScore2Genomes = new TreeMap<>();					
+				} else {
+					String[] fields = line.split(":");
+					String[] indices = fields[1].split(",");
+					ArrayList<String> genomes = new ArrayList<>();
+					for(String index : indices) {
+						genomes.add(allGenomes[Integer.parseInt(index)]);
+					}
+					currentScore2Genomes.put(Float.parseFloat(fields[0]), genomes);
+				}
+			}
+			if(currentRead != null) {
+				read2Score2Genomes.put(currentRead, currentScore2Genomes);
+			}
+			reader.close();
+		} catch(Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
+		for(int i = 2; i < batch; i++) {			
 			try {
 				BufferedReader reader = new BufferedReader(new FileReader("Batch" + i + ".txt"));
-				String line = null;
 				while((line = reader.readLine()) != null) {
-					
+					if(line.startsWith("Read")) {
+						currentRead = line.split("\\s+")[1];
+						
+					}
 				}
 				reader.close();
 			} catch(Exception e) {
