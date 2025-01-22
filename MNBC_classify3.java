@@ -146,6 +146,10 @@ public class MNBC_classify3 {
 		int batch = 1;
 		do {
 			System.out.println("*****DB batch " + batch + "*****");
+			genomeIds.clear();
+			logFres.clear();
+			genomeMinimizers.clear();
+			
 			ExecutorService nested = Executors.newFixedThreadPool(numberOfCores - 1);
 			CompletionService<Object[]> pool = new ExecutorCompletionService<Object[]>(nested);
 			for(int i = 0; i < countFiles.length; i++) {
@@ -186,13 +190,16 @@ public class MNBC_classify3 {
 			if(batch == 1) {
 				if(usedCount == countFiles.length) {
 					
-					break;
+					writer.close();
+					long endTime = System.nanoTime();
+					System.out.println("done in " + ((endTime - startTime) / 1000000000) + " seconds");
+					System.exit(0);
 				}
 			}
 
 			PrintWriter writerTemp = null;
 			try {				
-				writerTemp = new PrintWriter(new FileWriter("Batch" + batch + ".txt"), true);
+				writerTemp = new PrintWriter(new FileWriter("Batch" + (batch++) + ".txt"), true);
 				writerTemp.print(genomeIds.get(0));
 				for(int i = 1; i < genomeIds.size(); i++) {
 					writerTemp.print("," + genomeIds.get(i));
@@ -226,9 +233,11 @@ public class MNBC_classify3 {
 						for(Entry<Float, MutableIntList> entry : ((TreeMap<Float, MutableIntList>) outcome[1]).entrySet()) {
 							writerTemp.print(entry.getKey() + ":");
 							IntIterator it = entry.getValue().intIterator();
+							writerTemp.print(it.next());
 							while(it.hasNext()) {
-								
+								writerTemp.print("," + it.next());
 							}
+							writerTemp.println();
 						}
 					}
 					/*if(outcome.endsWith("- finished")) {
@@ -237,13 +246,29 @@ public class MNBC_classify3 {
 						writer.println(outcome);
 					}*/
 				}
-				writer.close();
+				writerTemp.close();
 			} catch(Exception e) {
 				e.printStackTrace();
 				System.exit(1);
 			}
 		} while(usedCount < countFiles.length);
 		
+		HashMap<String, TreeMap<Float, ArrayList<String>>> read2Score2Genomes= new HashMap<>();
+		for(int i = 1; i < batch; i++) {
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader("Batch" + i + ".txt"));
+				String line = null;
+				while((line = reader.readLine()) != null) {
+					
+				}
+				reader.close();
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		}
+		
+		writer.close();
 		long endTime = System.nanoTime();
 		System.out.println("done in " + ((endTime - startTime) / 1000000000) + " seconds");
 	}
