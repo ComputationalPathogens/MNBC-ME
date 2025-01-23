@@ -259,8 +259,7 @@ public class MNBC_classify4 {
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader("Batch" + 1 + ".txt"));	
 			String line = reader.readLine();
-			String[] allGenomes = line.split(",");
-			
+			String[] allGenomes = line.split(",");			
 			while((line = reader.readLine()) != null) {
 				if(line.startsWith("Read")) {
 					if(currentRead != null) {
@@ -291,6 +290,8 @@ public class MNBC_classify4 {
 		for(int i = 2; i < batch; i++) {			
 			try {
 				BufferedReader reader = new BufferedReader(new FileReader("Batch" + i + ".txt"));
+				String line = reader.readLine();
+				String[] allGenomes = line.split(",");
 				while((line = reader.readLine()) != null) {
 					if(line.startsWith("Read")) {
 						currentRead = line.split("\\s+")[1];
