@@ -294,8 +294,23 @@ public class MNBC_classify4 {
 				String[] allGenomes = line.split(",");
 				while((line = reader.readLine()) != null) {
 					if(line.startsWith("Read")) {
-						currentRead = line.split("\\s+")[1];
-						
+						currentScore2Genomes = read2Score2Genomes.get(line.split("\\s+")[1]);
+					} else {
+						String[] fields = line.split(":");
+						float score = Float.parseFloat(fields[0]);
+						String[] indices = fields[1].split(",");
+						if(currentScore2Genomes.containsKey(score)) {
+							ArrayList<String> genomes = currentScore2Genomes.get(score);
+							for(String index : indices) {
+								genomes.add(allGenomes[Integer.parseInt(index)]);
+							}
+						} else {
+							ArrayList<String> genomes = new ArrayList<>();
+							for(String index : indices) {
+								genomes.add(allGenomes[Integer.parseInt(index)]);
+							}
+							currentScore2Genomes.put(Float.parseFloat(fields[0]), genomes);
+						}
 					}
 				}
 				reader.close();
@@ -304,6 +319,8 @@ public class MNBC_classify4 {
 				System.exit(1);
 			}
 		}
+		
+		for
 		
 		writer.close();
 		long endTime = System.nanoTime();
