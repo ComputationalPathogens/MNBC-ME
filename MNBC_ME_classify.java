@@ -27,7 +27,7 @@ import org.eclipse.collections.api.set.primitive.MutableIntSet;
 import org.eclipse.collections.impl.list.mutable.primitive.IntArrayList;
 import org.eclipse.collections.impl.set.mutable.primitive.IntHashSet;
 
-public class MNBC_classify3 {
+public class MNBC_ME_classify {
 	private static int k = 15;
 	private static int numberOfThreads;
 	private static float kmerPenalty = -2000.0F;

@@ -29,8 +29,7 @@ import java.util.zip.GZIPOutputStream;
 import org.eclipse.collections.api.set.primitive.MutableIntSet;
 import org.eclipse.collections.impl.set.mutable.primitive.IntHashSet;
 
-public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use canonical kmers; And only use slurm-jobid.out as the progress file
-						//Only use minimizer seeds (w=k, window size=w+k-1), base/kmer ordering can change (here use default alphabetical ACGT order)
+public class MNBC_ME_build {
 	private static int k = 15;
 	private static int numberOfThreads;
 	private static int lengthThreshold = 0;
@@ -39,13 +38,13 @@ public class MNBC_build { //Based on NaiveBayesClassifierCount_V3, only use cano
 	private static String previousProgressPath;
 	private static boolean ifPlasmid = false;
 	
-	public static void main(String[] args) {
+	public static void execute(String[] args) {
 		if(args.length == 1) {
 			printHelpInfo();
 			System.exit(0);
 		}
 		
-		for(int i = 0; i < args.length; i++) {
+		for(int i = 1; i < args.length; i++) {
 			if(args[i].startsWith("-")) {
 				switch(args[i].charAt(1)) {
 					case 'k':
