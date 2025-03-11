@@ -6,11 +6,30 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 
 public class MNBC_ME_taxonomyVirushostdb {
-	public static void main(String[] args) {
-		String virushostdbTsvFilePath = args[0]; // /Drives/O/USERS/rlu/3types/virushostdb.tsv
-		String taxid2parents_VHTsvFilePath = args[1]; // /Drives/O/USERS/rlu/3types/taxid2parents_VH.tsv
-		String outputFilePath = args[2];
-		String virusSeqDirPath = args[3]; // /Drives/O/USERS/rlu/3types/virus_seq
+	private static String virushostdbTsvFilePath; // /Drives/O/USERS/rlu/3types/virushostdb.tsv
+	private static String taxid2parents_VHTsvFilePath; // /Drives/O/USERS/rlu/3types/taxid2parents_VH.tsv
+	private static String outputFilePath;
+	private static String virusSeqDirPath; // /Drives/O/USERS/rlu/3types/virus_seq
+	
+	public static void execute(String[] args) {
+		for(int i = 2; i < args.length; i++) {
+			if(args[i].startsWith("-")) {
+				switch(args[i].charAt(1)) {
+					case 's':
+						virushostdbTsvFilePath = args[i + 1];
+						break;
+					case 't':
+						taxid2parents_VHTsvFilePath = args[i + 1];
+						break;
+					case 'o':
+						outputFilePath = args[i + 1];
+						break;
+					case 'h':
+						printHelpInfo();
+						System.exit(0);
+				}
+			}
+		}
 		
 		HashMap<String, String> seqId2TaxId = new HashMap<>();
 		HashMap<String, String> seqId2VirusName = new HashMap<>();
@@ -103,5 +122,13 @@ public class MNBC_ME_taxonomyVirushostdb {
 		}
 		
 		System.out.println("done");
+	}
+	
+	private static void printHelpInfo() {
+		System.out.println("This program generates the taxonomy file for viruses from the Virus-Host DB database.");
+		System.out.println("-h:	Show this help menu");
+		System.out.println("-s:	Summary file in Virus-Host DB (i.e. virushostdb.tsv))");
+		System.out.println("-t:	Taxonomy file in Virus-Host DB (i.e. taxid2parents_VH.tsv)");		
+		System.out.println("-o:	Output taxonomy file for the database");
 	}
 }

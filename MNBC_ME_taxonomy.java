@@ -12,13 +12,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class MNBC_ME_taxonomy {
-	public static String genomeDirPath; //Directory containing downloaded RefSeq reference genomes of interest, these genomes will be used as the reference database
-	public static String refseqAssemblySummaryPath; //Example filename: assembly_summary_refseq.txt
-	public static String nodeDmpPath; //Example filename: nodes.dmp
-	public static String outputPath; //Example filename: refSeq_prokaryote_complete_genomes_ok_status_metainfo.txt
+	private static String genomeDirPath; //Directory containing downloaded RefSeq reference genomes of interest, these genomes will be used as the reference database
+	private static String refseqAssemblySummaryPath; //Example filename: assembly_summary_refseq.txt
+	private static String nodeDmpPath; //Example filename: nodes.dmp
+	private static String outputPath; //Example filename: refSeq_prokaryote_complete_genomes_ok_status_metainfo.txt
 	
 	public static void execute(String[] args) {
-		if(args.length == 1) {
+		if(args.length == 2) {
 			printHelpInfo();
 			System.exit(0);
 		}
@@ -57,7 +57,7 @@ public class MNBC_ME_taxonomy {
 		
 		try {
 			PrintWriter writer = new PrintWriter(outputPath);
-			writer.print("Accession\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tKingdom\tDomain\tOrganism\n");
+			writer.print("Accession\tType\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tKingdom\tDomain\tOrganism\n");
 			generateGenomeTaxonomyTableRows(writer, refseqAssemblyIDs, refseqAssemblyID2Taxid, taxid2TaxLevel, taxid2ParentTaxid);
 			writer.close();
 		} catch(Exception e) {
@@ -92,6 +92,11 @@ public class MNBC_ME_taxonomy {
 			}				
 			fillRanksArray(ranks[0], ranks, taxid2TaxLevel, taxid2ParentTaxid);			
 			
+			if(ranks[7].equals("10239")) {
+				row += "\tvirus";
+			} else {
+				row += "\tchromosome";
+			}
 			for(String rank : ranks) {
 				row += "\t" + rank;
 			}
@@ -210,7 +215,7 @@ public class MNBC_ME_taxonomy {
 	}
 	
 	private static void printHelpInfo() {
-		System.out.println("This MNBC_taxonomy tool (v1.2) generates the taxonomy file for a reference database.");
+		System.out.println("This program generates the taxonomy file for prokaryotic genomes (chromosomes) from NCBI.");
 		System.out.println("-h:	Show this help menu");
 		System.out.println("-a:	Assembly summary file downloaded from NCBI (e.g. assembly_summary_refseq.txt from https://ftp.ncbi.nlm.nih.gov/genomes/refseq/))");
 		System.out.println("-n:	Taxonomy nodes.dmp file downoaded from NCBI (e.g. taxdmp.zip from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)");		

@@ -37,9 +37,9 @@ public class MNBC_ME {
 	}
 	
 	private static void help() {
-		System.out.println("MNBC (v1.2): a taxonomic read classifier");
-		System.out.println("Step 1: generate taxonomy file -- Run 'MNBC taxonomy -h' for help");
-		System.out.println("Step 2: build reference database -- Run 'MNBC build -h' for help");
-		System.out.println("Step 3: classify reads -- Run 'MNBC classify -h' for help");		
+		System.out.println("MNBC-ME (v1.0): a tool for mobile element identification");
+		System.out.println("Step 1: generate taxonomy file -- Run 'MNBC_ME taxonomy ncbi -h', 'MNBC_ME taxonomy plsdb -h' and 'MNBC_ME taxonomy virushostdb -h'for help");
+		System.out.println("Step 2: build reference database -- Run 'MNBC_ME build -h' for help");
+		System.out.println("Step 3: classify reads -- Run 'MNBC_ME classify -h' for help");		
 	}
 }

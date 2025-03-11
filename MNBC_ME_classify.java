@@ -49,13 +49,13 @@ public class MNBC_ME_classify {
 	private static BlockingQueue<String> resultQueue; //Balance consumers and writer
 	private static AtomicInteger erroredConsumerCount = new AtomicInteger();
 	
-	public static void main(String[] args) {
+	public static void execute(String[] args) {
 		if(args.length == 1) {
 			printHelpInfo();
 			System.exit(0);
 		}
 		
-		for(int i = 0; i < args.length; i++) {
+		for(int i = 1; i < args.length; i++) {
 			if(args[i].startsWith("-")) {
 				switch(args[i].charAt(1)) {
 					case 'k':

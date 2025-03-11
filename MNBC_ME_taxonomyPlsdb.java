@@ -6,11 +6,33 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 
 public class MNBC_ME_taxonomyPlsdb {
-	public static void main(String[] args) {
-		String seqDirPath = args[0]; // /Drives/O/USERS/rlu/3types/plsdb_seq/
-		String nuccoreFilePath = args[1]; // /Drives/O/USERS/rlu/3types/plsdb_nuccore.tsv
-		String taxonomyFilePath = args[2]; // /Drives/O/USERS/rlu/3types/plsdb_taxonomy.csv
-		String outputFilePath = args[3];
+	private static String seqDirPath; // /Drives/O/USERS/rlu/3types/plsdb_seq/
+	private static String nuccoreFilePath; // /Drives/O/USERS/rlu/3types/plsdb_nuccore.tsv
+	private static String taxonomyFilePath; // /Drives/O/USERS/rlu/3types/plsdb_taxonomy.csv
+	private static String outputFilePath;
+	
+	public static void execute(String[] args) {
+		for(int i = 2; i < args.length; i++) {
+			if(args[i].startsWith("-")) {
+				switch(args[i].charAt(1)) {
+					case 'i':
+						seqDirPath = args[i + 1];
+						break;
+					case 'n':
+						nuccoreFilePath = args[i + 1];
+						break;
+					case 't':
+						taxonomyFilePath = args[i + 1];
+						break;
+					case 'o':
+						outputFilePath = args[i + 1];
+						break;
+					case 'h':
+						printHelpInfo();
+						System.exit(0);
+				}
+			}
+		}
 		
 		HashMap<String, String> seqId2Name = new HashMap<>();
 		HashMap<String, String> seqId2Tax = new HashMap<>();
@@ -80,5 +102,14 @@ public class MNBC_ME_taxonomyPlsdb {
 		}
 		
 		System.out.println("done");
+	}
+	
+	private static void printHelpInfo() {
+		System.out.println("This program generates the taxonomy file for plasmids from the PLSDB database.");
+		System.out.println("-h:	Show this help menu");
+		System.out.println("-i:	Input directory containing plasmid sequences in PLSDB, each file containing one plasmid sequence");
+		System.out.println("-n:	Nuccore file in PLSDB (i.e. nuccore.csv)");		
+		System.out.println("-t:	Taxonomy file in PLSDB (i.e. taxonomy.csv)");
+		System.out.println("-o:	Output taxonomy file");
 	}
 }
