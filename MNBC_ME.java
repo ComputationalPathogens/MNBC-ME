@@ -38,7 +38,7 @@ public class MNBC_ME {
 	
 	private static void help() {
 		System.out.println("MNBC-ME (v1.0): a tool for mobile element identification");
-		System.out.println("Step 1: generate taxonomy file for NCBI prokaryoptic genomes, PLSDB plasmids and Virus-Host DB viruses -- Run 'MNBC_ME taxonomy ncbi -h', 'MNBC_ME taxonomy plsdb -h' and 'MNBC_ME taxonomy virushostdb -h'for help");
+		System.out.println("Step 1: generate taxonomy file for NCBI prokaryoptic genomes, PLSDB plasmids or Virus-Host DB viruses -- Run 'MNBC_ME taxonomy ncbi -h', 'MNBC_ME taxonomy plsdb -h' or 'MNBC_ME taxonomy virushostdb -h' for help");
 		System.out.println("Step 2: build index files for reference sequences -- Run 'MNBC_ME build -h' for help");
 		System.out.println("Step 3: classify reads -- Run 'MNBC_ME classify -h' for help");		
 	}

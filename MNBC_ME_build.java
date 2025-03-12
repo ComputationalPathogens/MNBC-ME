@@ -461,7 +461,7 @@ public class MNBC_ME_build {
 						line = line.toLowerCase();
 						if(line.contains("plasmid")) {
 							retain = false;
-							plasmidId = line.split("\\s+")[0].substring(1);
+							plasmidId = line.split("\\s+")[0].substring(1).toUpperCase();
 						} else {
 							retain = true;							
 						}

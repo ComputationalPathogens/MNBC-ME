@@ -1,0 +1,2 @@
+Accession	Type	Species	Genus	Family	Order	Class	Phylum	Kingdom	Domain	Organism
+NZ_CP124330.1	plasmid	562	561	543	91347	1236	1224	null	2	Escherichia coli strain AVS0787 plasmid pAVS0787-B, complete sequence

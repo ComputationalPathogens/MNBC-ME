@@ -1015,7 +1015,7 @@ public class MNBC_ME_classify {
 	}
 	
 	private static void printHelpInfo() {
-		System.out.println("This MNBC_classify tool (v2.0) classifies reads against a reference database.");
+		System.out.println("This program classifies reads against a reference database.");
 		System.out.println("-h:	Show this help menu");		
 		System.out.println("-c:	Number of threads");
 		System.out.println("-d:	Input database directory");

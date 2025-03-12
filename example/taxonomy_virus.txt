@@ -1,0 +1,2 @@
+Accession	Type	Species	Genus	Family	Order	Class	Phylum	Kingdom	Domain	Organism
+NC_048211	virus	1508228	693996	11118	76804	2732506	2732408	2732396	10239	Wencheng Sm shrew coronavirus

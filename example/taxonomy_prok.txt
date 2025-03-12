@@ -1,0 +1,2 @@
+Accession	Type	Species	Genus	Family	Order	Class	Phylum	Kingdom	Domain	Organism
+GCF_038431905.1	chromosome	287	286	135621	72274	1236	1224	3379134	2	Pseudomonas aeruginosa strain=2016N06-105

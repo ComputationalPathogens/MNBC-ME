@@ -1,0 +1,4 @@
+Accession	Type	Species	Genus	Family	Order	Class	Phylum	Kingdom	Domain	Organism
+GCF_038431905.1	chromosome	287	286	135621	72274	1236	1224	3379134	2	Pseudomonas aeruginosa strain=2016N06-105
+NZ_CP124330.1	plasmid	562	561	543	91347	1236	1224	null	2	Escherichia coli strain AVS0787 plasmid pAVS0787-B, complete sequence
+NC_048211	virus	1508228	693996	11118	76804	2732506	2732408	2732396	10239	Wencheng Sm shrew coronavirus
