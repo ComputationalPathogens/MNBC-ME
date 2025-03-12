@@ -59,7 +59,7 @@ Then the commands in the following 3 steps can be simplified to "<b>java -cp MNB
 (If you installed Java JDK in mamba/conda, then the 3 commands can be also simplified to "<b>java -cp MNBC.jar -Xmx1G MNBC ...</b>")  
 
 <b>Step 1</b>:  
-Run the following command to generate the taxonomy file of the prokaryotic chromosomes:  
+Run the following command to generate the taxonomy file for prokaryotic chromosomes from NCBI GenBank and RefSeq:  
 ````
 ../jdk-17.0.12/bin/java -cp MNBC_ME.jar -Xmx1G MNBC_ME taxonomy ncbi -i example/prok_seq/ -a example/assembly_summary_refseq.txt -n example/nodes.dmp -o example/taxonomy_prok.txt
 ````
@@ -67,4 +67,40 @@ Run the following command to generate the taxonomy file of the prokaryotic chrom
 ```-a```:	Assembly summary file downloaded from NCBI (e.g. assembly_summary_refseq.txt downloaded from https://ftp.ncbi.nlm.nih.gov/genomes/refseq/))  
 ```-n```:	Taxonomy nodes.dmp file downoaded from NCBI (the file 'taxdmp.zip' is downloaded from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)  
 ```-i```:	Input directory containing the (gzipped) files of reference genomes from NCBI GenBank and RefSeq (e.g. GCF_000009045.1_ASM904v1_genomic.fna.gz is a reference genome sequence file downloaded from RefSeq)  
-```-o```:	Output taxonomy file for the database
+```-o```:	Output taxonomy file
+
+Run the following command to generate the taxonomy file for plasmids from the PLSDB database:  
+````
+../jdk-17.0.12/bin/java -cp MNBC_ME.jar -Xmx1G MNBC_ME taxonomy plsdb -i example/plsdb_seq/ -n example/plsdb_nuccore.tsv -t example/plsdb_taxonomy.csv -o example/taxonomy_plsdb.txt
+````
+(The following help menu displays by using ```-h```)  
+```-i```:	Input directory containing plasmidic reference sequences in PLSDB, each file containing one plasmid sequence  
+```-n```:	Nuccore file in PLSDB (i.e. nuccore.tsv)  
+```-t```:	Taxonomy file in PLSDB (i.e. taxonomy.csv)  
+```-o```:	Output taxonomy file
+
+Run the following command to generate the taxonomy file for viruses from the Virus-Host DB database:  
+````
+../jdk-17.0.12/bin/java -cp MNBC_ME.jar -Xmx1G MNBC_ME taxonomy virushostdb -i example/virus_seq/ -s example/virushostdb.tsv -t example/taxid2parents_VH.tsv -o example/taxonomy_virus.txt
+````
+(The following help menu displays by using ```-h```)  
+```-i```:	Input directory containing viral reference sequences in Virus-Host DB, each file containing one virus sequence  
+```-s```:	Summary file in Virus-Host DB (i.e. virushostdb.tsv)  
+```-t```:	Taxonomy file in Virus-Host DB (i.e. taxid2parents_VH.tsv)  
+```-o```:	Output taxonomy file
+
+<b>Tip</b>:
+Sometimes a genome assembly accession (e.g. GCF_021047685.1) does not exist in the assembly summary file, or its taxon number does not exist in the nodes.dmp file. If this happens MNBC will output error information for manual check.
+
+<b>Step 2</b>:  
+Run the following command to build the database:  
+````
+../jdk-17.0.12/bin/java -cp MNBC.jar -Xmx1G MNBC build -c 2 -f 300000 -i example/RefSeq_genomes/ -o example/db/
+````
+(The following help menu displays by using ```-h```)  
+```-c```:	Number of threads  
+```-i```:	Input directory containing the (gzipped) files of reference sequences (e.g. GCF_000834455.1_ASM83445v1_genomic.fna.gz is a reference genome sequence file downloaded from RefSeq)  
+```-o```: Existing output database directory (please first make this directory if it doesn't already exist)  
+```-k (optional)```: K-mer length (an integer between 1 and 15 inclusive) (default 15)  
+```-f (optional)```: Filtering threshold on the sequence length (an integer >= 0). Chromosomes with lengths below this threshold are ignored as well as all plasmids. The default value is 0 (i.e. all chromosomes are retained).  
+```-b (optional)```: Log file of the previous prematurely killed run (i.e. .out file in Slurm). This allows breakpoint resumption after the previous run exits abnormally.

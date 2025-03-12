@@ -215,7 +215,7 @@ public class MNBC_ME_taxonomy {
 	}
 	
 	private static void printHelpInfo() {
-		System.out.println("This program generates the taxonomy file for prokaryotic genomes (chromosomes) from NCBI.");
+		System.out.println("This program generates the taxonomy file for prokaryotic genomes (chromosomes) from NCBI GenBank and RefSeq.");
 		System.out.println("-h:	Show this help menu");
 		System.out.println("-a:	Assembly summary file downloaded from NCBI (e.g. assembly_summary_refseq.txt from https://ftp.ncbi.nlm.nih.gov/genomes/refseq/))");
 		System.out.println("-n:	Taxonomy nodes.dmp file downoaded from NCBI (e.g. taxdmp.zip from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)");		
