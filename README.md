@@ -135,26 +135,17 @@ GCF_038431905.1	chromosome	287	286	135621	72274	1236	1224	3379134	2	Pseudomonas 
 NZ_CP124330.1	plasmid	562	561	543	91347	1236	1224	null	2	Escherichia coli strain AVS0787 plasmid pAVS0787-B, complete sequence  
 NC_048211	virus	1508228	693996	11118	76804	2732506	2732408	2732396	10239	Wencheng Sm shrew coronavirus  
 ````
-The 1st column is the sequence accession. The 2nd column is the general type of the sequence. The 3rd to 10th columns are the taxon numbers of the prokaryotic or viral genome from the species level to the domain level, or the host taxon numbers of the plasmid. The 11th column is the string name (species and strain) of the genome, or the string name of the host of the plasmid.
+The 1st column is the sequence accession. The 2nd column is the general type of the sequence. The 3rd to 10th columns are the taxon numbers of the prokaryotic or viral genome from the species level to the domain level, or the host taxon numbers of the plasmid. The last column is the string name (species and strain) of the genome, or the string name of the host of the plasmid.
 
 ## Format of the classification file
 In the tab-delimited classification file 'result.txt' produced in Step 3, the 1st row contains column headers, and each subsequent row gives the classification for a read:  
 ````
-Read	Species	Genus	Family	Order	Class	Phylum	Kingdom	Domain	Candidates  
-SRR227300.1.1	562	561	543	91347	1236	1224	3379134	2	GCF_022869985.1  
-SRR227300.2.1	562	561	543	91347	1236	1224	3379134	2	GCF_022869985.1  
-SRR227300.26.1	562	561	543	91347	1236	1224	3379134	2	GCF_022869985.1  
-SRR227300.27.1	562	561	543	91347	1236	1224	3379134	2	GCF_022869985.1  
-SRR227300.28.1	562	561	543	91347	1236	1224	3379134	2	GCF_022869985.1  
-SRR032501.1.2	29485	629	1903411	91347	1236	1224	3379134	2	GCF_000834455.1  
-SRR032501.2.2	29485	629	1903411	91347	1236	1224	3379134	2	GCF_000834455.1  
-SRR032501.3.2	29485	629	1903411	91347	1236	1224	3379134	2	GCF_000834455.1  
-SRR032501.4.2	29485	629	1903411	91347	1236	1224	3379134	2	GCF_000834455.1  
-SRR032501.5.2	29485	629	1903411	91347	1236	1224	3379134	2	GCF_000834455.1  
-SRR095845.1746	unclassified  
-SRR095845.1745	unclassified  
-SRR095845.1747	unclassified  
-SRR095845.1748	unclassified  
-SRR095845.1744	unclassified  
+Read	Type	Species	Genus	Family	Order	Class	Phylum	Kingdom	Superkingdom	Candidates  
+read_32	chromosome	287	286	135621	72274	1236	1224	3379134	2	GCF_038431905.1  
+read_95	chromosome	287	286	135621	72274	1236	1224	3379134	2	GCF_038431905.1  
+read_6	plasmid	562	561	543	91347	1236	1224	null	2	NZ_CP124330.1  
+read_13	plasmid	562	561	543	91347	1236	1224	null	2	NZ_CP124330.1  
+read_4	virus	1508228	693996	11118	76804	2732506	2732408	2732396	10239	NC_048211  
+read_8	virus	1508228	693996	11118	76804	2732506	2732408	2732396	10239	NC_048211  
 ````
-The 1st column is the read ID, the 2nd to 9th columns are assigned taxon numbers from the species level to the domain level, and the last column is the accessions of all candidate reference genomes determining the predicted species. It can be seen that all 15 reads were correctly classified (i.e. assigned the correct species-level taxon numbers, or labelled as unclassified).
+The 1st column is the read ID. The 2nd column is the general type of the read. The 3rd to 10th columns are the assigned (host) taxon numbers from the species level to the domain level. The last column is the accessions of all candidate reference sequences determining the predicted (host) species. It can be seen that all 6 reads were correctly classified (i.e. assigned the correct species-level (host) taxon numbers).
