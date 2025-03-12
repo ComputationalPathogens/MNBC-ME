@@ -89,6 +89,8 @@ Run the following command to generate the taxonomy file for viruses from the Vir
 ```-t```:	Taxonomy file in Virus-Host DB (i.e. taxid2parents_VH.tsv)  
 ```-o```:	Output taxonomy file
 
+Merge the three files 'taxonomy_prok.txt', 'taxonomy_plsdb.txt' and 'taxonomy_virus.txt' into one file 'taxonomy.txt', and the three folders 'prok_seq', 'plsdb_seq' and 'virus_seq' into one folder 'seq'.
+
 <b>Tip</b>:
 Sometimes a genome assembly accession (e.g. GCF_021047685.1) does not exist in the assembly summary file, or its taxon number does not exist in the nodes.dmp file. If this happens MNBC will output error information for manual check.
 
