@@ -136,9 +136,9 @@ public class MNBC_ME_taxonomyVirushostdb {
 	private static void printHelpInfo() {
 		System.out.println("This program generates the taxonomy file for viruses from the Virus-Host DB database.");
 		System.out.println("-h:	Show this help menu");
-		System.out.println("-i:	Input directory containing virus sequences in Virus-Host DB, each file containing one virus sequence");
+		System.out.println("-i:	Input directory containing viral reference sequences in Virus-Host DB, each file containing one virus sequence");
 		System.out.println("-s:	Summary file in Virus-Host DB (i.e. virushostdb.tsv))");
 		System.out.println("-t:	Taxonomy file in Virus-Host DB (i.e. taxid2parents_VH.tsv)");		
-		System.out.println("-o:	Output taxonomy file for the database");
+		System.out.println("-o:	Output taxonomy file");
 	}
 }

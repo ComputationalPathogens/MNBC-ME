@@ -45,3 +45,26 @@ Change to the 'MNBC-ME' folder using the following command.
 cd ..
 ````
 
+<b>(Optional pre-step) add Java to Linux PATH variable:</b>  
+Replace <parent_directory> in the following line with the actual path, then append this line to the end of the '.bashrc' file in your home directory.  
+````
+export PATH=<parent_directory>/jdk-17.0.12/bin:${PATH}
+````
+Either open a new terminal window, or run the following command in the current window.
+````
+source ~/.bashrc
+````
+Then the commands in the following 3 steps can be simplified to "<b>java -cp MNBC.jar -Xmx1G MNBC ...</b>".
+
+(If you installed Java JDK in mamba/conda, then the 3 commands can be also simplified to "<b>java -cp MNBC.jar -Xmx1G MNBC ...</b>")  
+
+<b>Step 1</b>:  
+Run the following command to generate the taxonomy file of the prokaryotic chromosomes:  
+````
+../jdk-17.0.12/bin/java -cp MNBC_ME.jar -Xmx1G MNBC_ME taxonomy ncbi -i example/prok_seq/ -a example/assembly_summary_refseq.txt -n example/nodes.dmp -o example/taxonomy_prok.txt
+````
+(The following help menu displays by using ```-h```)  
+```-a```:	Assembly summary file downloaded from NCBI (e.g. assembly_summary_refseq.txt downloaded from https://ftp.ncbi.nlm.nih.gov/genomes/refseq/))  
+```-n```:	Taxonomy nodes.dmp file downoaded from NCBI (the file 'taxdmp.zip' is downloaded from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/)  
+```-i```:	Input directory containing the (gzipped) files of reference genomes from NCBI GenBank and RefSeq (e.g. GCF_000009045.1_ASM904v1_genomic.fna.gz is a reference genome sequence file downloaded from RefSeq)  
+```-o```:	Output taxonomy file for the database

@@ -113,7 +113,7 @@ public class MNBC_ME_taxonomyPlsdb {
 	private static void printHelpInfo() {
 		System.out.println("This program generates the taxonomy file for plasmids from the PLSDB database.");
 		System.out.println("-h:	Show this help menu");
-		System.out.println("-i:	Input directory containing plasmid sequences in PLSDB, each file containing one plasmid sequence");
+		System.out.println("-i:	Input directory containing plasmidic reference sequences in PLSDB, each file containing one plasmid sequence");
 		System.out.println("-n:	Nuccore file in PLSDB (i.e. nuccore.tsv)");		
 		System.out.println("-t:	Taxonomy file in PLSDB (i.e. taxonomy.csv)");
 		System.out.println("-o:	Output taxonomy file");
