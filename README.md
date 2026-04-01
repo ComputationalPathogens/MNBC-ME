@@ -127,6 +127,15 @@ Run the following command to classify the reads against the database:
 <b>Tip</b>:
 When using a large reference database, increase the memory amount that MNBC-ME can use in Steps 2 and 3 by adjusting the '-Xmx' parameter (e.g. -Xmx200G), and also increase the number of CPU cores by adjusting the '-c' parameter (e.g. -c 100) to accelerate.
 
+## Run MNBC-ME from Bioconda
+MNBC-ME can be installed from bioconda channel when available, the java .jar file for MNBC-ME is wrapped as mnbc-me and can be used as
+```
+mnbc-me taxonomy ncbi -h
+MNBC_ME_MEM=4G mnbc-me classify -c 2 -h
+JAVA_OPTS="-Xms512M" mnbc-me build -c 2 -h
+```
+MNBC_ME_MEM and JAVA_OPTS can be used to assign memory to the program. Note, for MNBC_ME_MEM only integer values followed by a 'G' is accepted while JAVA_OPTS can have multiple options for memory provided within quotes. Number of threads can be assigned using -c which is a class parameter, use as documented earlier. 
+
 ## Format of the taxonomy file
 In the tab-delimited taxonomy file 'taxonomy.txt' produced in Step 1, the 1st row contains column headers, and each subsequent row gives the taxonomy information for a reference sequence in the database:
 ````
